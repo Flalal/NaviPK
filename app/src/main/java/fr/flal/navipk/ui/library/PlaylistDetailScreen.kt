@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import fr.flal.navipk.api.Song
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.api.isYoutube
 import fr.flal.navipk.api.youtubeId
 import fr.flal.navipk.api.youtube.YoutubeClient
 import fr.flal.navipk.data.CacheManager
@@ -93,11 +94,12 @@ fun PlaylistDetailScreen(
                         Button(
                             onClick = {
                                 if (songs.isNotEmpty()) {
-                                    if (isYtPlaylist) {
+                                    val ytSongs = songs.filter { it.isYoutube }
+                                    if (ytSongs.isNotEmpty()) {
                                         scope.launch {
                                             isResolvingUrls = true
                                             try {
-                                                songs.map { s ->
+                                                ytSongs.map { s ->
                                                     async(Dispatchers.IO) {
                                                         try { YoutubeClient.getStreamUrl(s.youtubeId) } catch (_: Exception) {}
                                                     }
@@ -122,11 +124,12 @@ fun PlaylistDetailScreen(
                         OutlinedButton(
                             onClick = {
                                 if (songs.isNotEmpty()) {
-                                    if (isYtPlaylist) {
+                                    val ytSongs = songs.filter { it.isYoutube }
+                                    if (ytSongs.isNotEmpty()) {
                                         scope.launch {
                                             isResolvingUrls = true
                                             try {
-                                                songs.map { s ->
+                                                ytSongs.map { s ->
                                                     async(Dispatchers.IO) {
                                                         try { YoutubeClient.getStreamUrl(s.youtubeId) } catch (_: Exception) {}
                                                     }
@@ -147,24 +150,25 @@ fun PlaylistDetailScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Lecture aléatoire")
                         }
-                        if (!isYtPlaylist) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            val allCached = songs.isNotEmpty() && songs.all { it.id in cachedIds }
-                            OutlinedButton(
-                                onClick = {
-                                    if (songs.isNotEmpty()) {
-                                        scope.launch { CacheManager.downloadSongs(songs) }
-                                    }
-                                },
-                                enabled = !allCached,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                            ) {
-                                Icon(
-                                    if (allCached) Icons.Default.CloudDone else Icons.Default.Download,
-                                    contentDescription = null
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(if (allCached) "Téléchargé" else "Télécharger")
+                        run {
+                            val navSongs = songs.filter { !it.isYoutube }
+                            if (navSongs.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                val allCached = navSongs.all { it.id in cachedIds }
+                                OutlinedButton(
+                                    onClick = {
+                                        scope.launch { CacheManager.downloadSongs(navSongs) }
+                                    },
+                                    enabled = !allCached,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                                ) {
+                                    Icon(
+                                        if (allCached) Icons.Default.CloudDone else Icons.Default.Download,
+                                        contentDescription = null
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(if (allCached) "Téléchargé" else "Télécharger")
+                                }
                             }
                         }
                         HorizontalDivider()
@@ -175,12 +179,17 @@ fun PlaylistDetailScreen(
                             song = song,
                             trackNumber = index + 1,
                             showThumbnail = isYtPlaylist,
+                            onRemove = if (isYtPlaylist) ({
+                                YouTubeLibraryManager.removeSongFromPlaylist(playlistId, song.id)
+                                songs = songs.filter { it.id != song.id }
+                            }) else null,
                             onClick = {
-                                if (isYtPlaylist) {
+                                val ytSongs = songs.filter { it.isYoutube }
+                                if (ytSongs.isNotEmpty()) {
                                     scope.launch {
                                         isResolvingUrls = true
                                         try {
-                                            songs.map { s ->
+                                            ytSongs.map { s ->
                                                 async(Dispatchers.IO) {
                                                     try { YoutubeClient.getStreamUrl(s.youtubeId) } catch (_: Exception) {}
                                                 }

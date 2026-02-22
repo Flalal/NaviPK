@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -37,6 +39,7 @@ import fr.flal.navipk.api.coverArtUrl
 import fr.flal.navipk.api.isYoutube
 import fr.flal.navipk.data.YouTubeLibraryManager
 import fr.flal.navipk.player.PlayerManager
+import fr.flal.navipk.player.RadioManager
 import fr.flal.navipk.ui.library.PlaylistPickerDialog
 import fr.flal.navipk.ui.library.YouTubePlaylistPickerDialog
 import fr.flal.navipk.player.PlayerState
@@ -337,9 +340,11 @@ private fun NowPlayingContent(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Action row: favorite + playlist + queue
+            // Action row: favorite + playlist + radio + queue
             var showPlaylistDialog by remember { mutableStateOf(false) }
             var showYtPlaylistDialog by remember { mutableStateOf(false) }
+            var showPlaylistTypeChooser by remember { mutableStateOf(false) }
+            val isRadioLoading by RadioManager.isLoading.collectAsState()
 
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -371,13 +376,35 @@ private fun NowPlayingContent(
 
                 IconButton(onClick = {
                     val s = song ?: return@IconButton
-                    if (s.isYoutube) showYtPlaylistDialog = true else showPlaylistDialog = true
+                    if (s.isYoutube) showYtPlaylistDialog = true else showPlaylistTypeChooser = true
                 }) {
                     Icon(
                         Icons.Default.PlaylistAdd,
                         contentDescription = "Ajouter à une playlist",
                         tint = OnPlayerSecondary
                     )
+                }
+
+                IconButton(
+                    onClick = {
+                        val s = song ?: return@IconButton
+                        RadioManager.startRadio(s)
+                    },
+                    enabled = !isRadioLoading
+                ) {
+                    if (isRadioLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                            color = OnPlayerSecondary
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Radio,
+                            contentDescription = "Lancer la radio",
+                            tint = OnPlayerSecondary
+                        )
+                    }
                 }
 
                 IconButton(onClick = onQueueClick) {
@@ -387,6 +414,34 @@ private fun NowPlayingContent(
                         tint = OnPlayerSecondary
                     )
                 }
+            }
+
+            if (showPlaylistTypeChooser && song != null) {
+                AlertDialog(
+                    onDismissRequest = { showPlaylistTypeChooser = false },
+                    title = { Text("Type de playlist") },
+                    text = {
+                        Column {
+                            ListItem(
+                                headlineContent = { Text("Playlist Navidrome") },
+                                modifier = Modifier.clickable {
+                                    showPlaylistTypeChooser = false
+                                    showPlaylistDialog = true
+                                }
+                            )
+                            ListItem(
+                                headlineContent = { Text("Playlist locale") },
+                                modifier = Modifier.clickable {
+                                    showPlaylistTypeChooser = false
+                                    showYtPlaylistDialog = true
+                                }
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showPlaylistTypeChooser = false }) { Text("Annuler") }
+                    }
+                )
             }
 
             if (showPlaylistDialog && song != null) {

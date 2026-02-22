@@ -98,11 +98,39 @@ object YouTubeLibraryManager {
         save()
     }
 
+    fun removeSongFromPlaylist(playlistId: String, songId: String) {
+        data = data.copy(
+            playlists = data.playlists.map { pl ->
+                if (pl.id == playlistId) {
+                    pl.copy(songs = pl.songs.filter { it.id != songId })
+                } else {
+                    pl
+                }
+            }
+        )
+        save()
+    }
+
     fun addSongToPlaylist(playlistId: String, song: Song) {
         data = data.copy(
             playlists = data.playlists.map { pl ->
                 if (pl.id == playlistId && pl.songs.none { it.id == song.id }) {
                     pl.copy(songs = pl.songs + song)
+                } else {
+                    pl
+                }
+            }
+        )
+        save()
+    }
+
+    fun addSongsToPlaylist(playlistId: String, songs: List<Song>) {
+        data = data.copy(
+            playlists = data.playlists.map { pl ->
+                if (pl.id == playlistId) {
+                    val existingIds = pl.songs.map { it.id }.toSet()
+                    val newSongs = songs.filter { it.id !in existingIds }
+                    pl.copy(songs = pl.songs + newSongs)
                 } else {
                     pl
                 }

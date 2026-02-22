@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import fr.flal.navipk.api.Playlist
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.api.youtube.YoutubeClient
 import fr.flal.navipk.data.YouTubeLibraryManager
 import fr.flal.navipk.data.YouTubePlaylist
 import kotlinx.coroutines.launch
@@ -30,6 +32,9 @@ fun PlaylistsScreen(
     var newPlaylistName by remember { mutableStateOf("") }
     var playlistToDelete by remember { mutableStateOf<Playlist?>(null) }
     var ytPlaylistToDelete by remember { mutableStateOf<YouTubePlaylist?>(null) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importUrl by remember { mutableStateOf("") }
+    var isImporting by remember { mutableStateOf(false) }
     val ytPlaylists by YouTubeLibraryManager.playlists.collectAsState()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -151,11 +156,87 @@ fun PlaylistsScreen(
         )
     }
 
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isImporting) {
+                    showImportDialog = false
+                    importUrl = ""
+                }
+            },
+            title = { Text("Importer une playlist YouTube") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = importUrl,
+                        onValueChange = { importUrl = it },
+                        label = { Text("URL de la playlist") },
+                        singleLine = true,
+                        enabled = !isImporting,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (isImporting) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Import en cours...")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val url = importUrl.trim()
+                        if (url.isNotEmpty()) {
+                            isImporting = true
+                            scope.launch {
+                                try {
+                                    val result = YoutubeClient.getPlaylistSongs(url)
+                                    val pl = YouTubeLibraryManager.createPlaylist(result.name)
+                                    YouTubeLibraryManager.addSongsToPlaylist(pl.id, result.songs)
+                                    showImportDialog = false
+                                    importUrl = ""
+                                    snackbarHostState.showSnackbar(
+                                        "\"${result.name}\" importée (${result.songs.size} morceaux)"
+                                    )
+                                } catch (e: Exception) {
+                                    snackbarHostState.showSnackbar(
+                                        "Erreur : ${e.localizedMessage ?: "import échoué"}"
+                                    )
+                                } finally {
+                                    isImporting = false
+                                }
+                            }
+                        }
+                    },
+                    enabled = !isImporting && importUrl.isNotBlank()
+                ) { Text("Importer") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showImportDialog = false; importUrl = "" },
+                    enabled = !isImporting
+                ) {
+                    Text("Annuler")
+                }
+            }
+        )
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Playlists") },
+                actions = {
+                    IconButton(onClick = { showImportDialog = true }) {
+                        Icon(Icons.Default.Link, contentDescription = "Importer une playlist YouTube")
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -205,7 +286,7 @@ fun PlaylistsScreen(
                 if (ytPlaylists.isNotEmpty()) {
                     item {
                         Text(
-                            "YouTube",
+                            "Locales",
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 4.dp)
                         )

@@ -30,6 +30,15 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 - Détail artiste avec ses albums
 - Détail playlist avec ses morceaux
 
+### YouTube
+- Recherche de musique sur YouTube (bascule Navidrome/YouTube)
+- Lecture en streaming avec résolution d'URL automatique
+- Favoris YouTube stockés localement (JSON)
+- Playlists YouTube locales (création, ajout de morceaux, suppression, retrait individuel)
+- Import de playlist YouTube publique par URL (avec pagination complète)
+- Menu contextuel complet sur les résultats YouTube (favoris, playlist, lire ensuite, ajouter à la file, radio)
+- Ajout à une playlist depuis le lecteur plein écran (Navidrome ou YouTube)
+
 ### Recherche
 - Recherche globale (artistes, albums, morceaux)
 - Résultats groupés par catégorie
@@ -44,7 +53,8 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 
 ### Favoris
 - Marquer/démarquer un morceau en favori (star/unstar Subsonic)
-- Écran dédié listant tous les favoris (morceaux, albums, artistes)
+- Favoris YouTube locaux (stockage JSON, toggle depuis le player ou le menu contextuel)
+- Écran dédié listant tous les favoris (morceaux, albums, artistes, YouTube)
 - Lecture directe ou aléatoire des favoris
 
 ### File d'attente
@@ -64,10 +74,20 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 - Éviction LRU par timestamp
 
 ### Playlists
-- Parcourir et lire les playlists
-- Créer une playlist vide
+- Parcourir et lire les playlists (Navidrome + locales)
+- Playlists mixtes : mélanger morceaux Navidrome et YouTube dans une même playlist locale
+- Créer une playlist vide (Navidrome ou locale)
 - Supprimer une playlist (avec confirmation)
-- Ajouter un morceau à une playlist existante (depuis le menu contextuel)
+- Supprimer un morceau individuel d'une playlist locale
+- Ajouter un morceau à une playlist existante (depuis le menu contextuel ou le lecteur)
+- Import de playlist YouTube publique par URL
+- Playlists locales stockées en JSON
+
+### Radio / Mix automatique
+- Lancer une radio à partir de n'importe quel morceau (Navidrome ou YouTube)
+- Navidrome : morceaux similaires via `getSimilarSongs2`, fallback sur morceaux aléatoires
+- YouTube : recherche automatique de morceaux similaires
+- Accessible depuis le lecteur plein écran (bouton Radio) et le menu contextuel de chaque morceau
 
 ### Navigation
 - Bottom NavigationBar 5 onglets avec préservation d'état (saveState/restoreState)
@@ -125,10 +145,12 @@ fr.flal.navipk/
 │   └── SubsonicModels.kt       # Modèles de données (Album, Song, Artist...)
 ├── data/
 │   ├── CacheManager.kt         # Cache offline (téléchargement, index JSON, éviction)
-│   └── PreferencesManager.kt   # Sauvegarde des credentials + settings cache
+│   ├── PreferencesManager.kt   # Sauvegarde des credentials + settings cache
+│   └── YouTubeLibraryManager.kt # Favoris + playlists YouTube locaux (JSON + StateFlow)
 ├── player/
 │   ├── PlaybackService.kt      # Service Media3 (notification, Bluetooth)
-│   └── PlayerManager.kt        # Contrôle de la lecture (play, queue, shuffle, repeat)
+│   ├── PlayerManager.kt        # Contrôle de la lecture (play, queue, shuffle, repeat)
+│   └── RadioManager.kt         # Génération de file radio (morceaux similaires)
 ├── ui/
 │   ├── login/
 │   │   └── LoginScreen.kt      # Écran de connexion
@@ -173,10 +195,15 @@ L'application utilise les endpoints suivants de l'API Subsonic (v1.16.1) :
 | `deletePlaylist.view` | Supprimer une playlist |
 | `search3.view` | Recherche globale |
 | `getRandomSongs.view` | Morceaux aléatoires |
+| `getSimilarSongs2.view` | Morceaux similaires (radio) |
 | `star.view` / `unstar.view` | Ajouter/retirer des favoris |
 | `getStarred2.view` | Récupérer les favoris |
 | `stream.view` | Streaming audio |
 | `getCoverArt.view` | Pochettes d'album |
+
+## Roadmap
+
+*Toutes les features de la v1.5.0 sont livrées.*
 
 ## Licence
 

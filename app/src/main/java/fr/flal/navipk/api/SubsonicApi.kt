@@ -77,4 +77,10 @@ interface SubsonicApi {
     suspend fun deletePlaylist(
         @Query("id") id: String
     ): SubsonicResponse
+
+    @GET("rest/getSimilarSongs2.view")
+    suspend fun getSimilarSongs2(
+        @Query("id") id: String,
+        @Query("count") count: Int = 50
+    ): SubsonicResponse
 }

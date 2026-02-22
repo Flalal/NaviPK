@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,12 +33,14 @@ import fr.flal.navipk.api.AlbumWithSongs
 import fr.flal.navipk.api.Playlist
 import fr.flal.navipk.api.Song
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.api.coverArtUrl
 import fr.flal.navipk.api.isYoutube
 import fr.flal.navipk.data.CacheManager
 import fr.flal.navipk.data.DownloadState
 import fr.flal.navipk.data.YouTubeLibraryManager
 import fr.flal.navipk.data.YouTubePlaylist
 import fr.flal.navipk.player.PlayerManager
+import fr.flal.navipk.player.RadioManager
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -213,6 +216,7 @@ fun SongItem(
     onClick: () -> Unit,
     initialIsFavorite: Boolean = false,
     showThumbnail: Boolean = false,
+    onRemove: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -249,7 +253,7 @@ fun SongItem(
         leadingContent = {
             if (showThumbnail) {
                 AsyncImage(
-                    model = song.coverArt,
+                    model = song.coverArtUrl(),
                     contentDescription = null,
                     modifier = Modifier.size(48.dp).clip(MaterialTheme.shapes.small),
                     contentScale = ContentScale.Crop
@@ -309,13 +313,47 @@ fun SongItem(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Ajouter à une playlist") },
+                            text = { Text("Lancer la radio") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Radio, contentDescription = null)
+                            },
+                            onClick = {
+                                showMenu = false
+                                RadioManager.startRadio(song)
+                            }
+                        )
+                        if (onRemove != null) {
+                            DropdownMenuItem(
+                                text = { Text("Retirer de la playlist") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Delete, contentDescription = null)
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    onRemove()
+                                }
+                            )
+                        }
+                        if (!isYt) {
+                            DropdownMenuItem(
+                                text = { Text("Playlist Navidrome") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.PlaylistAdd, contentDescription = null)
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    showPlaylistDialog = true
+                                }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("Playlist locale") },
                             leadingIcon = {
                                 Icon(Icons.Default.PlaylistAdd, contentDescription = null)
                             },
                             onClick = {
                                 showMenu = false
-                                if (isYt) showYtPlaylistDialog = true else showPlaylistDialog = true
+                                showYtPlaylistDialog = true
                             }
                         )
                         if (!isYt) {
@@ -465,11 +503,11 @@ fun YouTubePlaylistPickerDialog(song: Song, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ajouter à une playlist YouTube") },
+        title = { Text("Ajouter à une playlist locale") },
         text = {
             Column {
                 if (ytPlaylists.isEmpty() && !showCreate) {
-                    Text("Aucune playlist YouTube")
+                    Text("Aucune playlist locale")
                 }
                 ytPlaylists.forEach { playlist ->
                     ListItem(

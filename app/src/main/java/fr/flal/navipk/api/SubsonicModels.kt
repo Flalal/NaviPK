@@ -19,7 +19,8 @@ data class SubsonicResponseBody(
     val randomSongs: RandomSongs? = null,
     val starred2: Starred2? = null,
     val playlists: PlaylistsContainer? = null,
-    val playlist: PlaylistWithSongs? = null
+    val playlist: PlaylistWithSongs? = null,
+    val similarSongs2: SimilarSongs2? = null
 )
 
 data class SubsonicError(
@@ -125,6 +126,11 @@ data class PlaylistWithSongs(
     val name: String,
     val songCount: Int? = null,
     val entry: List<Song>? = null
+)
+
+// Similar Songs
+data class SimilarSongs2(
+    val song: List<Song>? = null
 )
 
 // Starred / Favorites

@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.playlist.PlaylistInfo
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 
@@ -75,6 +76,38 @@ object YoutubeClient {
         Log.d(TAG, "Stream URL resolved (${streamUrl.length} chars)")
         streamUrlCache[videoUrl] = Pair(streamUrl, System.currentTimeMillis() + CACHE_DURATION_MS)
         streamUrl
+    }
+
+    data class YouTubePlaylistResult(val name: String, val songs: List<Song>)
+
+    suspend fun getPlaylistSongs(playlistUrl: String): YouTubePlaylistResult = withContext(Dispatchers.IO) {
+        try {
+            val info = PlaylistInfo.getInfo(ServiceList.YouTube, playlistUrl)
+            val allItems = mutableListOf<StreamInfoItem>()
+            // First page
+            var page = info.relatedItems
+            allItems.addAll(page.filterIsInstance<StreamInfoItem>())
+            // Pagination
+            var nextPage = info.nextPage
+            while (nextPage != null) {
+                val morePage = PlaylistInfo.getMoreItems(ServiceList.YouTube, playlistUrl, nextPage)
+                allItems.addAll(morePage.items.filterIsInstance<StreamInfoItem>())
+                nextPage = morePage.nextPage
+            }
+            val songs = allItems.map { item ->
+                Song(
+                    id = "yt:${item.url}",
+                    title = item.name,
+                    artist = item.uploaderName,
+                    duration = item.duration.toInt(),
+                    coverArt = item.thumbnails.lastOrNull()?.url
+                )
+            }
+            YouTubePlaylistResult(name = info.name, songs = songs)
+        } catch (e: Exception) {
+            Log.e(TAG, "getPlaylistSongs failed for '$playlistUrl'", e)
+            throw e
+        }
     }
 
     fun getCachedStreamUrl(videoUrl: String): String? {
