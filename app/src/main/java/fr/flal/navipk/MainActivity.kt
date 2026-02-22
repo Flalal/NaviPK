@@ -5,8 +5,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
@@ -14,20 +17,27 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -40,6 +50,7 @@ import fr.flal.navipk.api.coverArtUrl
 import fr.flal.navipk.api.youtube.YoutubeClient
 import fr.flal.navipk.data.CacheManager
 import fr.flal.navipk.data.PreferencesManager
+import fr.flal.navipk.data.UpdateManager
 import fr.flal.navipk.player.PlayerManager
 import fr.flal.navipk.ui.library.*
 import fr.flal.navipk.ui.login.LoginScreen
@@ -48,6 +59,7 @@ import fr.flal.navipk.ui.player.MiniPlayer
 import fr.flal.navipk.ui.search.SearchScreen
 import fr.flal.navipk.ui.theme.NaviPKTheme
 import fr.flal.navipk.ui.theme.rememberDominantColor
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -66,6 +78,10 @@ class MainActivity : ComponentActivity() {
                 preferencesManager.getUsername(),
                 preferencesManager.getPassword()
             )
+        }
+
+        lifecycleScope.launch {
+            UpdateManager.checkForUpdate(BuildConfig.VERSION_NAME)
         }
 
         enableEdgeToEdge()
@@ -98,6 +114,11 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
     val currentRoute = navBackStackEntry?.destination?.route
     var showFullPlayer by rememberSaveable { mutableStateOf(false) }
 
+    // Update state
+    val updateState by UpdateManager.state.collectAsState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     // Dynamic color from current song's cover art
     val coverArtUrl = remember(playerState.currentSong) {
         playerState.currentSong?.coverArtUrl(128)
@@ -105,6 +126,22 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
     val dominantColor = rememberDominantColor(coverArtUrl)
 
     NaviPKTheme(seedColor = dominantColor) {
+        // Update dialog
+        val release = updateState.release
+        if (release != null && release.tagName != preferencesManager.getDismissedVersion()) {
+            UpdateDialog(
+                releaseName = release.name.ifBlank { release.tagName },
+                releaseNotes = release.body,
+                downloadProgress = updateState.downloadProgress,
+                isDownloading = updateState.isDownloading,
+                onUpdate = { scope.launch { UpdateManager.downloadAndInstall(context) } },
+                onLater = { UpdateManager.dismiss() },
+                onIgnore = {
+                    preferencesManager.setDismissedVersion(release.tagName)
+                    UpdateManager.dismiss()
+                }
+            )
+        }
         val isLoggedIn = currentRoute != null && currentRoute != "login"
 
         Scaffold(
@@ -292,4 +329,49 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
             )
         }
     }
+}
+
+@Composable
+private fun UpdateDialog(
+    releaseName: String,
+    releaseNotes: String,
+    downloadProgress: Float,
+    isDownloading: Boolean,
+    onUpdate: () -> Unit,
+    onLater: () -> Unit,
+    onIgnore: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = { if (!isDownloading) onLater() },
+        title = { Text("Mise à jour disponible") },
+        text = {
+            Column {
+                Text("Version : $releaseName")
+                if (releaseNotes.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(releaseNotes)
+                }
+                if (isDownloading) {
+                    Spacer(Modifier.height(16.dp))
+                    LinearProgressIndicator(
+                        progress = { downloadProgress },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (!isDownloading) {
+                TextButton(onClick = onUpdate) { Text("Mettre à jour") }
+            }
+        },
+        dismissButton = {
+            if (!isDownloading) {
+                Column {
+                    TextButton(onClick = onLater) { Text("Plus tard") }
+                    TextButton(onClick = onIgnore) { Text("Ignorer cette version") }
+                }
+            }
+        }
+    )
 }

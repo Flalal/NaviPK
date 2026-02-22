@@ -28,6 +28,12 @@ class PreferencesManager(context: Context) {
         prefs.edit().putInt("max_cache_size_mb", sizeMb).apply()
     }
 
+    fun getDismissedVersion(): String = prefs.getString("dismissed_update_version", "") ?: ""
+
+    fun setDismissedVersion(version: String) {
+        prefs.edit().putString("dismissed_update_version", version).apply()
+    }
+
     fun clear() {
         prefs.edit().clear().apply()
     }
