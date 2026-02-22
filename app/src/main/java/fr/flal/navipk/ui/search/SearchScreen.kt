@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import fr.flal.navipk.api.*
 import fr.flal.navipk.api.youtube.YoutubeClient
+import fr.flal.navipk.ui.library.SongItem
 import fr.flal.navipk.ui.library.formatDuration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -211,35 +212,11 @@ fun SearchScreen(
                                 )
                             }
                             items(ytSongs) { song ->
-                                ListItem(
-                                    headlineContent = {
-                                        Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    },
-                                    supportingContent = {
-                                        Text(
-                                            song.artist ?: "",
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    leadingContent = {
-                                        AsyncImage(
-                                            model = song.coverArt,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(48.dp).clip(MaterialTheme.shapes.small),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    },
-                                    trailingContent = {
-                                        song.duration?.let {
-                                            Text(
-                                                formatDuration(it),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    },
-                                    modifier = Modifier.clickable {
+                                SongItem(
+                                    song = song,
+                                    trackNumber = 0,
+                                    showThumbnail = true,
+                                    onClick = {
                                         scope.launch {
                                             isResolvingUrls = true
                                             try {

@@ -34,6 +34,7 @@ import coil.compose.AsyncImage
 import fr.flal.navipk.api.SubsonicClient
 import fr.flal.navipk.api.coverArtUrl
 import fr.flal.navipk.api.isYoutube
+import fr.flal.navipk.data.YouTubeLibraryManager
 import fr.flal.navipk.player.PlayerManager
 import fr.flal.navipk.player.PlayerState
 import fr.flal.navipk.ui.theme.OnPlayerPrimary
@@ -117,7 +118,13 @@ private fun NowPlayingContent(
     val song = playerState.currentSong
     var currentPosition by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
-    var isFavorite by remember { mutableStateOf(false) }
+    val ytFavIds by YouTubeLibraryManager.favoriteSongIds.collectAsState()
+    var isFavorite by remember { mutableStateOf(
+        if (song?.isYoutube == true) YouTubeLibraryManager.isFavorite(song.id) else false
+    ) }
+    if (song?.isYoutube == true) {
+        isFavorite = song.id in ytFavIds
+    }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(playerState.isPlaying, playerState.currentSong) {
@@ -332,26 +339,28 @@ private fun NowPlayingContent(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                if (song?.isYoutube != true) {
-                    IconButton(onClick = {
-                        val songId = song?.id ?: return@IconButton
+                IconButton(onClick = {
+                    val s = song ?: return@IconButton
+                    if (s.isYoutube) {
+                        YouTubeLibraryManager.toggleFavorite(s)
+                    } else {
                         scope.launch {
                             try {
                                 if (isFavorite) {
-                                    SubsonicClient.getApi().unstar(songId)
+                                    SubsonicClient.getApi().unstar(s.id)
                                 } else {
-                                    SubsonicClient.getApi().star(songId)
+                                    SubsonicClient.getApi().star(s.id)
                                 }
                                 isFavorite = !isFavorite
                             } catch (_: Exception) {}
                         }
-                    }) {
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = if (isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
-                            tint = if (isFavorite) MaterialTheme.colorScheme.error else OnPlayerSecondary
-                        )
                     }
+                }) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.error else OnPlayerSecondary
+                    )
                 }
 
                 IconButton(onClick = onQueueClick) {

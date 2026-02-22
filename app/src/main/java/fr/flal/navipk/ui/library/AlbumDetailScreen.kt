@@ -32,8 +32,11 @@ import fr.flal.navipk.api.AlbumWithSongs
 import fr.flal.navipk.api.Playlist
 import fr.flal.navipk.api.Song
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.api.isYoutube
 import fr.flal.navipk.data.CacheManager
 import fr.flal.navipk.data.DownloadState
+import fr.flal.navipk.data.YouTubeLibraryManager
+import fr.flal.navipk.data.YouTubePlaylist
 import fr.flal.navipk.player.PlayerManager
 import kotlinx.coroutines.launch
 
@@ -209,11 +212,19 @@ fun SongItem(
     trackNumber: Int,
     onClick: () -> Unit,
     initialIsFavorite: Boolean = false,
+    showThumbnail: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    var isFavorite by remember { mutableStateOf(initialIsFavorite) }
+    val isYt = song.isYoutube
+    val ytFavIds by YouTubeLibraryManager.favoriteSongIds.collectAsState()
+    var isFavorite by remember { mutableStateOf(if (isYt) song.id in ytFavIds else initialIsFavorite) }
+    // Keep in sync with reactive state for YouTube
+    if (isYt) {
+        isFavorite = song.id in ytFavIds
+    }
     var showPlaylistDialog by remember { mutableStateOf(false) }
+    var showYtPlaylistDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val cachedIds by CacheManager.cachedSongIds.collectAsState()
     val downloadStates by CacheManager.downloadStates.collectAsState()
@@ -236,20 +247,29 @@ fun SongItem(
             )
         },
         leadingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "$trackNumber",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            if (showThumbnail) {
+                AsyncImage(
+                    model = song.coverArt,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp).clip(MaterialTheme.shapes.small),
+                    contentScale = ContentScale.Crop
                 )
-                if (isCached) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        Icons.Default.CloudDone,
-                        contentDescription = "Hors-ligne",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.primary
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "$trackNumber",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (isCached) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.CloudDone,
+                            contentDescription = "Hors-ligne",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         },
@@ -295,44 +315,46 @@ fun SongItem(
                             },
                             onClick = {
                                 showMenu = false
-                                showPlaylistDialog = true
+                                if (isYt) showYtPlaylistDialog = true else showPlaylistDialog = true
                             }
                         )
-                        if (isCached) {
-                            DropdownMenuItem(
-                                text = { Text("Supprimer du cache") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Delete, contentDescription = null)
-                                },
-                                onClick = {
-                                    CacheManager.removeSong(song.id)
-                                    showMenu = false
-                                }
-                            )
-                        } else {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        when (dlState) {
-                                            DownloadState.DOWNLOADING -> "Téléchargement..."
-                                            DownloadState.ERROR -> "Réessayer le téléchargement"
-                                            else -> "Télécharger"
-                                        }
-                                    )
-                                },
-                                leadingIcon = {
-                                    if (dlState == DownloadState.DOWNLOADING) {
-                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                                    } else {
-                                        Icon(Icons.Default.Download, contentDescription = null)
+                        if (!isYt) {
+                            if (isCached) {
+                                DropdownMenuItem(
+                                    text = { Text("Supprimer du cache") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Delete, contentDescription = null)
+                                    },
+                                    onClick = {
+                                        CacheManager.removeSong(song.id)
+                                        showMenu = false
                                     }
-                                },
-                                enabled = dlState != DownloadState.DOWNLOADING,
-                                onClick = {
-                                    scope.launch { CacheManager.downloadSong(song) }
-                                    showMenu = false
-                                }
-                            )
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            when (dlState) {
+                                                DownloadState.DOWNLOADING -> "Téléchargement..."
+                                                DownloadState.ERROR -> "Réessayer le téléchargement"
+                                                else -> "Télécharger"
+                                            }
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        if (dlState == DownloadState.DOWNLOADING) {
+                                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                        } else {
+                                            Icon(Icons.Default.Download, contentDescription = null)
+                                        }
+                                    },
+                                    enabled = dlState != DownloadState.DOWNLOADING,
+                                    onClick = {
+                                        scope.launch { CacheManager.downloadSong(song) }
+                                        showMenu = false
+                                    }
+                                )
+                            }
                         }
                         DropdownMenuItem(
                             text = {
@@ -345,15 +367,19 @@ fun SongItem(
                                 )
                             },
                             onClick = {
-                                scope.launch {
-                                    try {
-                                        if (isFavorite) {
-                                            SubsonicClient.getApi().unstar(song.id)
-                                        } else {
-                                            SubsonicClient.getApi().star(song.id)
-                                        }
-                                        isFavorite = !isFavorite
-                                    } catch (_: Exception) {}
+                                if (isYt) {
+                                    YouTubeLibraryManager.toggleFavorite(song)
+                                } else {
+                                    scope.launch {
+                                        try {
+                                            if (isFavorite) {
+                                                SubsonicClient.getApi().unstar(song.id)
+                                            } else {
+                                                SubsonicClient.getApi().star(song.id)
+                                            }
+                                            isFavorite = !isFavorite
+                                        } catch (_: Exception) {}
+                                    }
                                 }
                                 showMenu = false
                             }
@@ -369,6 +395,13 @@ fun SongItem(
         PlaylistPickerDialog(
             songId = song.id,
             onDismiss = { showPlaylistDialog = false }
+        )
+    }
+
+    if (showYtPlaylistDialog) {
+        YouTubePlaylistPickerDialog(
+            song = song,
+            onDismiss = { showYtPlaylistDialog = false }
         )
     }
 }
@@ -414,6 +447,71 @@ fun PlaylistPickerDialog(songId: String, onDismiss: () -> Unit) {
                                 onDismiss()
                             }
                         )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Annuler") }
+        }
+    )
+}
+
+@Composable
+fun YouTubePlaylistPickerDialog(song: Song, onDismiss: () -> Unit) {
+    val ytPlaylists by YouTubeLibraryManager.playlists.collectAsState()
+    var showCreate by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Ajouter à une playlist YouTube") },
+        text = {
+            Column {
+                if (ytPlaylists.isEmpty() && !showCreate) {
+                    Text("Aucune playlist YouTube")
+                }
+                ytPlaylists.forEach { playlist ->
+                    ListItem(
+                        headlineContent = { Text(playlist.name) },
+                        supportingContent = { Text("${playlist.songs.size} morceaux") },
+                        modifier = Modifier.clickable {
+                            YouTubeLibraryManager.addSongToPlaylist(playlist.id, song)
+                            onDismiss()
+                        }
+                    )
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                if (showCreate) {
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text("Nom de la playlist") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            val name = newName.trim()
+                            if (name.isNotEmpty()) {
+                                val pl = YouTubeLibraryManager.createPlaylist(name)
+                                YouTubeLibraryManager.addSongToPlaylist(pl.id, song)
+                                onDismiss()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Créer et ajouter")
+                    }
+                } else {
+                    TextButton(
+                        onClick = { showCreate = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.PlaylistAdd, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Nouvelle playlist")
                     }
                 }
             }

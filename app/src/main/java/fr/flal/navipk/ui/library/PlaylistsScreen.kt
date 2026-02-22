@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import fr.flal.navipk.api.Playlist
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.data.YouTubeLibraryManager
+import fr.flal.navipk.data.YouTubePlaylist
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,6 +29,8 @@ fun PlaylistsScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
     var playlistToDelete by remember { mutableStateOf<Playlist?>(null) }
+    var ytPlaylistToDelete by remember { mutableStateOf<YouTubePlaylist?>(null) }
+    val ytPlaylists by YouTubeLibraryManager.playlists.collectAsState()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -123,6 +127,30 @@ fun PlaylistsScreen(
         )
     }
 
+    ytPlaylistToDelete?.let { playlist ->
+        AlertDialog(
+            onDismissRequest = { ytPlaylistToDelete = null },
+            title = { Text("Supprimer la playlist") },
+            text = { Text("Supprimer \"${playlist.name}\" ?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        ytPlaylistToDelete = null
+                        YouTubeLibraryManager.deletePlaylist(playlist.id)
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Playlist supprimée")
+                        }
+                    }
+                ) { Text("Supprimer", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { ytPlaylistToDelete = null }) {
+                    Text("Annuler")
+                }
+            }
+        )
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -147,6 +175,15 @@ fun PlaylistsScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding)
             ) {
+                if (playlists.isNotEmpty()) {
+                    item {
+                        Text(
+                            "Navidrome",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 4.dp)
+                        )
+                    }
+                }
                 items(playlists) { playlist ->
                     ListItem(
                         headlineContent = { Text(playlist.name) },
@@ -155,6 +192,33 @@ fun PlaylistsScreen(
                         },
                         trailingContent = {
                             IconButton(onClick = { playlistToDelete = playlist }) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Supprimer",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        },
+                        modifier = Modifier.clickable { onPlaylistClick(playlist.id) }
+                    )
+                }
+                if (ytPlaylists.isNotEmpty()) {
+                    item {
+                        Text(
+                            "YouTube",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 4.dp)
+                        )
+                    }
+                }
+                items(ytPlaylists, key = { it.id }) { playlist ->
+                    ListItem(
+                        headlineContent = { Text(playlist.name) },
+                        supportingContent = {
+                            Text("${playlist.songs.size} morceaux")
+                        },
+                        trailingContent = {
+                            IconButton(onClick = { ytPlaylistToDelete = playlist }) {
                                 Icon(
                                     Icons.Default.Delete,
                                     contentDescription = "Supprimer",

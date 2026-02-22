@@ -50,6 +50,7 @@ import fr.flal.navipk.api.coverArtUrl
 import fr.flal.navipk.api.youtube.YoutubeClient
 import fr.flal.navipk.data.CacheManager
 import fr.flal.navipk.data.PreferencesManager
+import fr.flal.navipk.data.YouTubeLibraryManager
 import fr.flal.navipk.data.UpdateManager
 import fr.flal.navipk.player.PlayerManager
 import fr.flal.navipk.ui.library.*
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         preferencesManager = PreferencesManager(this)
         CacheManager.init(this)
+        YouTubeLibraryManager.init(this)
         PlayerManager.connect(this)
         YoutubeClient.init()
 

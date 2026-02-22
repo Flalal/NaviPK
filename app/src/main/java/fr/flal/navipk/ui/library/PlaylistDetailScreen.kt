@@ -18,8 +18,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import fr.flal.navipk.api.Song
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.api.youtubeId
+import fr.flal.navipk.api.youtube.YoutubeClient
 import fr.flal.navipk.data.CacheManager
+import fr.flal.navipk.data.YouTubeLibraryManager
 import fr.flal.navipk.player.PlayerManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,22 +35,33 @@ fun PlaylistDetailScreen(
     onBack: () -> Unit,
     onPlaySong: (Song, List<Song>) -> Unit
 ) {
+    val isYtPlaylist = playlistId.startsWith("ytpl:")
     var playlistName by remember { mutableStateOf("Playlist") }
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isResolvingUrls by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val cachedIds by CacheManager.cachedSongIds.collectAsState()
 
     LaunchedEffect(playlistId) {
-        try {
-            val response = SubsonicClient.getApi().getPlaylist(playlistId)
-            response.subsonicResponse.playlist?.let {
-                playlistName = it.name
-                songs = it.entry ?: emptyList()
+        if (isYtPlaylist) {
+            val pl = YouTubeLibraryManager.getPlaylist(playlistId)
+            if (pl != null) {
+                playlistName = pl.name
+                songs = pl.songs
             }
-        } catch (_: Exception) {
-        } finally {
             isLoading = false
+        } else {
+            try {
+                val response = SubsonicClient.getApi().getPlaylist(playlistId)
+                response.subsonicResponse.playlist?.let {
+                    playlistName = it.name
+                    songs = it.entry ?: emptyList()
+                }
+            } catch (_: Exception) {
+            } finally {
+                isLoading = false
+            }
         }
     }
 
@@ -68,60 +85,126 @@ fun PlaylistDetailScreen(
                 CircularProgressIndicator()
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding)
-            ) {
-                item {
-                    Button(
-                        onClick = {
-                            if (songs.isNotEmpty()) onPlaySong(songs.first(), songs)
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(16.dp)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Tout lire")
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = {
-                            if (songs.isNotEmpty()) {
-                                PlayerManager.shufflePlay(songs)
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    item {
+                        Button(
+                            onClick = {
+                                if (songs.isNotEmpty()) {
+                                    if (isYtPlaylist) {
+                                        scope.launch {
+                                            isResolvingUrls = true
+                                            try {
+                                                songs.map { s ->
+                                                    async(Dispatchers.IO) {
+                                                        try { YoutubeClient.getStreamUrl(s.youtubeId) } catch (_: Exception) {}
+                                                    }
+                                                }.awaitAll()
+                                                onPlaySong(songs.first(), songs)
+                                            } finally {
+                                                isResolvingUrls = false
+                                            }
+                                        }
+                                    } else {
+                                        onPlaySong(songs.first(), songs)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(16.dp)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Tout lire")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                if (songs.isNotEmpty()) {
+                                    if (isYtPlaylist) {
+                                        scope.launch {
+                                            isResolvingUrls = true
+                                            try {
+                                                songs.map { s ->
+                                                    async(Dispatchers.IO) {
+                                                        try { YoutubeClient.getStreamUrl(s.youtubeId) } catch (_: Exception) {}
+                                                    }
+                                                }.awaitAll()
+                                                PlayerManager.shufflePlay(songs)
+                                            } finally {
+                                                isResolvingUrls = false
+                                            }
+                                        }
+                                    } else {
+                                        PlayerManager.shufflePlay(songs)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                        ) {
+                            Icon(Icons.Default.Shuffle, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Lecture aléatoire")
+                        }
+                        if (!isYtPlaylist) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            val allCached = songs.isNotEmpty() && songs.all { it.id in cachedIds }
+                            OutlinedButton(
+                                onClick = {
+                                    if (songs.isNotEmpty()) {
+                                        scope.launch { CacheManager.downloadSongs(songs) }
+                                    }
+                                },
+                                enabled = !allCached,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                            ) {
+                                Icon(
+                                    if (allCached) Icons.Default.CloudDone else Icons.Default.Download,
+                                    contentDescription = null
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(if (allCached) "Téléchargé" else "Télécharger")
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                    ) {
-                        Icon(Icons.Default.Shuffle, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Lecture aléatoire")
+                        }
+                        HorizontalDivider()
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    val allCached = songs.isNotEmpty() && songs.all { it.id in cachedIds }
-                    OutlinedButton(
-                        onClick = {
-                            if (songs.isNotEmpty()) {
-                                scope.launch { CacheManager.downloadSongs(songs) }
+
+                    itemsIndexed(songs) { index, song ->
+                        SongItem(
+                            song = song,
+                            trackNumber = index + 1,
+                            showThumbnail = isYtPlaylist,
+                            onClick = {
+                                if (isYtPlaylist) {
+                                    scope.launch {
+                                        isResolvingUrls = true
+                                        try {
+                                            songs.map { s ->
+                                                async(Dispatchers.IO) {
+                                                    try { YoutubeClient.getStreamUrl(s.youtubeId) } catch (_: Exception) {}
+                                                }
+                                            }.awaitAll()
+                                            onPlaySong(song, songs)
+                                        } finally {
+                                            isResolvingUrls = false
+                                        }
+                                    }
+                                } else {
+                                    onPlaySong(song, songs)
+                                }
                             }
-                        },
-                        enabled = !allCached,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                    ) {
-                        Icon(
-                            if (allCached) Icons.Default.CloudDone else Icons.Default.Download,
-                            contentDescription = null
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(if (allCached) "Téléchargé" else "Télécharger")
                     }
-                    HorizontalDivider()
                 }
 
-                itemsIndexed(songs) { index, song ->
-                    SongItem(
-                        song = song,
-                        trackNumber = index + 1,
-                        onClick = { onPlaySong(song, songs) }
-                    )
+                if (isResolvingUrls) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
             }
         }

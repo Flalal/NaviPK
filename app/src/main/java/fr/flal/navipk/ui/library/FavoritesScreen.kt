@@ -18,7 +18,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import fr.flal.navipk.api.*
+import fr.flal.navipk.api.youtube.YoutubeClient
+import fr.flal.navipk.data.YouTubeLibraryManager
 import fr.flal.navipk.player.PlayerManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +37,9 @@ fun FavoritesScreen(
     var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
     var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    val ytFavorites by YouTubeLibraryManager.favorites.collectAsState()
+    var isResolvingUrls by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         try {
@@ -59,7 +68,7 @@ fun FavoritesScreen(
             ) {
                 CircularProgressIndicator()
             }
-        } else if (artists.isEmpty() && albums.isEmpty() && songs.isEmpty()) {
+        } else if (artists.isEmpty() && albums.isEmpty() && songs.isEmpty() && ytFavorites.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
@@ -71,100 +80,142 @@ fun FavoritesScreen(
                 )
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding)
-            ) {
-                if (songs.isNotEmpty()) {
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp, 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    onPlaySong(songs.first(), songs)
-                                },
-                                modifier = Modifier.weight(1f)
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    if (songs.isNotEmpty()) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp, 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Tout lire")
+                                Button(
+                                    onClick = {
+                                        onPlaySong(songs.first(), songs)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Tout lire")
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        PlayerManager.shufflePlay(songs)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Shuffle, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Aléatoire")
+                                }
                             }
-                            OutlinedButton(
-                                onClick = {
-                                    PlayerManager.shufflePlay(songs)
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.Shuffle, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Aléatoire")
-                            }
+                        }
+
+                        item {
+                            Text(
+                                "Morceaux favoris",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(16.dp, 8.dp, 16.dp, 4.dp)
+                            )
+                        }
+                        itemsIndexed(songs) { index, song ->
+                            SongItem(
+                                song = song,
+                                trackNumber = index + 1,
+                                onClick = { onPlaySong(song, songs) },
+                                initialIsFavorite = true
+                            )
                         }
                     }
 
-                    item {
-                        Text(
-                            "Morceaux favoris",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(16.dp, 8.dp, 16.dp, 4.dp)
-                        )
+                    if (albums.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Albums favoris",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 4.dp)
+                            )
+                        }
+                        items(albums) { album ->
+                            ListItem(
+                                headlineContent = {
+                                    Text(album.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                },
+                                supportingContent = {
+                                    album.artist?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                                },
+                                leadingContent = {
+                                    AsyncImage(
+                                        model = album.coverArt?.let { SubsonicClient.getCoverArtUrl(it, 100) },
+                                        contentDescription = null,
+                                        modifier = Modifier.size(48.dp).clip(MaterialTheme.shapes.small),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                },
+                                modifier = Modifier.clickable { onAlbumClick(album.id) }
+                            )
+                        }
                     }
-                    itemsIndexed(songs) { index, song ->
-                        SongItem(
-                            song = song,
-                            trackNumber = index + 1,
-                            onClick = { onPlaySong(song, songs) },
-                            initialIsFavorite = true
-                        )
+
+                    if (artists.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Artistes favoris",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 4.dp)
+                            )
+                        }
+                        items(artists) { artist ->
+                            ListItem(
+                                headlineContent = { Text(artist.name) },
+                                supportingContent = {
+                                    artist.albumCount?.let { Text("$it albums") }
+                                },
+                                modifier = Modifier.clickable { onArtistClick(artist.id) }
+                            )
+                        }
+                    }
+
+                    if (ytFavorites.isNotEmpty()) {
+                        item {
+                            Text(
+                                "YouTube",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 4.dp)
+                            )
+                        }
+                        items(ytFavorites, key = { it.id }) { song ->
+                            SongItem(
+                                song = song,
+                                trackNumber = 0,
+                                showThumbnail = true,
+                                onClick = {
+                                    scope.launch {
+                                        isResolvingUrls = true
+                                        try {
+                                            async(Dispatchers.IO) {
+                                                try { YoutubeClient.getStreamUrl(song.youtubeId) } catch (_: Exception) {}
+                                            }.await()
+                                            onPlaySong(song, listOf(song))
+                                        } finally {
+                                            isResolvingUrls = false
+                                        }
+                                    }
+                                },
+                                initialIsFavorite = true
+                            )
+                        }
                     }
                 }
 
-                if (albums.isNotEmpty()) {
-                    item {
-                        Text(
-                            "Albums favoris",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 4.dp)
-                        )
-                    }
-                    items(albums) { album ->
-                        ListItem(
-                            headlineContent = {
-                                Text(album.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            },
-                            supportingContent = {
-                                album.artist?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                            },
-                            leadingContent = {
-                                AsyncImage(
-                                    model = album.coverArt?.let { SubsonicClient.getCoverArtUrl(it, 100) },
-                                    contentDescription = null,
-                                    modifier = Modifier.size(48.dp).clip(MaterialTheme.shapes.small),
-                                    contentScale = ContentScale.Crop
-                                )
-                            },
-                            modifier = Modifier.clickable { onAlbumClick(album.id) }
-                        )
-                    }
-                }
-
-                if (artists.isNotEmpty()) {
-                    item {
-                        Text(
-                            "Artistes favoris",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(16.dp, 12.dp, 16.dp, 4.dp)
-                        )
-                    }
-                    items(artists) { artist ->
-                        ListItem(
-                            headlineContent = { Text(artist.name) },
-                            supportingContent = {
-                                artist.albumCount?.let { Text("$it albums") }
-                            },
-                            modifier = Modifier.clickable { onArtistClick(artist.id) }
-                        )
+                if (isResolvingUrls) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
                     }
                 }
             }
