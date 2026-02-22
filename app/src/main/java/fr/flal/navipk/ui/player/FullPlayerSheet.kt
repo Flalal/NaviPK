@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.api.coverArtUrl
+import fr.flal.navipk.api.isYoutube
 import fr.flal.navipk.player.PlayerManager
 import fr.flal.navipk.player.PlayerState
 import fr.flal.navipk.ui.theme.OnPlayerPrimary
@@ -103,7 +105,7 @@ private fun NowPlayingContent(
             .statusBarsPadding()
     ) {
         // Layer 1: Blurred background
-        val coverUrl = song?.coverArt?.let { SubsonicClient.getCoverArtUrl(it, 500) }
+        val coverUrl = song?.coverArtUrl(500)
         if (coverUrl != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             AsyncImage(
                 model = coverUrl,
@@ -322,24 +324,26 @@ private fun NowPlayingContent(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                IconButton(onClick = {
-                    val songId = song?.id ?: return@IconButton
-                    scope.launch {
-                        try {
-                            if (isFavorite) {
-                                SubsonicClient.getApi().unstar(songId)
-                            } else {
-                                SubsonicClient.getApi().star(songId)
-                            }
-                            isFavorite = !isFavorite
-                        } catch (_: Exception) {}
+                if (song?.isYoutube != true) {
+                    IconButton(onClick = {
+                        val songId = song?.id ?: return@IconButton
+                        scope.launch {
+                            try {
+                                if (isFavorite) {
+                                    SubsonicClient.getApi().unstar(songId)
+                                } else {
+                                    SubsonicClient.getApi().star(songId)
+                                }
+                                isFavorite = !isFavorite
+                            } catch (_: Exception) {}
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
+                            tint = if (isFavorite) MaterialTheme.colorScheme.error else OnPlayerSecondary
+                        )
                     }
-                }) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = if (isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
-                        tint = if (isFavorite) MaterialTheme.colorScheme.error else OnPlayerSecondary
-                    )
                 }
 
                 IconButton(onClick = onQueueClick) {

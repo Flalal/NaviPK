@@ -133,3 +133,12 @@ data class Starred2(
     val album: List<Album>? = null,
     val song: List<Song>? = null
 )
+
+// YouTube extensions
+val Song.isYoutube: Boolean get() = id.startsWith("yt:")
+val Song.youtubeId: String get() = id.removePrefix("yt:")
+
+fun Song.coverArtUrl(size: Int = 300): String? {
+    val ca = coverArt ?: return null
+    return if (isYoutube) ca else SubsonicClient.getCoverArtUrl(ca, size)
+}

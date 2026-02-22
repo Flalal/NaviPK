@@ -16,7 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.api.coverArtUrl
 import fr.flal.navipk.player.PlayerManager
 import fr.flal.navipk.player.PlayerState
 import kotlinx.coroutines.delay
@@ -61,7 +61,7 @@ fun MiniPlayer(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AsyncImage(
-                    model = song.coverArt?.let { SubsonicClient.getCoverArtUrl(it, 100) },
+                    model = song.coverArtUrl(100),
                     contentDescription = null,
                     modifier = Modifier
                         .size(48.dp)

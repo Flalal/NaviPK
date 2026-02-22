@@ -36,6 +36,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.api.coverArtUrl
+import fr.flal.navipk.api.youtube.YoutubeClient
 import fr.flal.navipk.data.CacheManager
 import fr.flal.navipk.data.PreferencesManager
 import fr.flal.navipk.player.PlayerManager
@@ -56,6 +58,7 @@ class MainActivity : ComponentActivity() {
         preferencesManager = PreferencesManager(this)
         CacheManager.init(this)
         PlayerManager.connect(this)
+        YoutubeClient.init()
 
         if (preferencesManager.isLoggedIn()) {
             SubsonicClient.configure(
@@ -97,7 +100,7 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
 
     // Dynamic color from current song's cover art
     val coverArtUrl = remember(playerState.currentSong) {
-        playerState.currentSong?.coverArt?.let { SubsonicClient.getCoverArtUrl(it, 128) }
+        playerState.currentSong?.coverArtUrl(128)
     }
     val dominantColor = rememberDominantColor(coverArtUrl)
 

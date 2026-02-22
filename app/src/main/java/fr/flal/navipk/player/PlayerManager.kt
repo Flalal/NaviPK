@@ -3,6 +3,7 @@ package fr.flal.navipk.player
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -10,11 +11,20 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import fr.flal.navipk.api.Song
-import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.api.coverArtUrl
+import fr.flal.navipk.api.isYoutube
+import fr.flal.navipk.api.youtubeId
+import fr.flal.navipk.api.youtube.YoutubeClient
 import fr.flal.navipk.data.CacheManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 data class PlayerState(
     val currentSong: Song? = null,
@@ -24,7 +34,8 @@ data class PlayerState(
     val queue: List<Song> = emptyList(),
     val currentIndex: Int = 0,
     val repeatMode: Int = Player.REPEAT_MODE_OFF,
-    val isShuffled: Boolean = false
+    val isShuffled: Boolean = false,
+    val isLoadingYoutube: Boolean = false
 )
 
 object PlayerManager {
@@ -33,6 +44,7 @@ object PlayerManager {
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
     private var originalQueue: List<Song> = emptyList()
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     fun connect(context: Context) {
         val sessionToken = SessionToken(
@@ -61,8 +73,47 @@ object PlayerManager {
                     currentIndex = index,
                     duration = mediaController?.duration ?: 0L
                 )
+                // Pre-resolve next YouTube songs
+                preResolveUpcoming(index)
             }
         })
+    }
+
+    private fun preResolveUpcoming(currentIndex: Int) {
+        val queue = _state.value.queue
+        val upcoming = queue.drop(currentIndex + 1).take(3)
+        for (song in upcoming) {
+            if (song.isYoutube && YoutubeClient.getCachedStreamUrl(song.youtubeId) == null) {
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        YoutubeClient.getStreamUrl(song.youtubeId)
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+    }
+
+    private fun buildMediaItem(s: Song): MediaItem {
+        val uri = if (s.isYoutube) {
+            val cached = YoutubeClient.getCachedStreamUrl(s.youtubeId)
+            if (cached.isNullOrBlank()) {
+                Log.w("PlayerManager", "No cached stream URL for: ${s.title}")
+            }
+            cached ?: ""
+        } else {
+            CacheManager.getPlaybackUri(s.id)
+        }
+        return MediaItem.Builder()
+            .setUri(uri)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(s.title)
+                    .setArtist(s.artist)
+                    .setAlbumTitle(s.album)
+                    .setArtworkUri(s.coverArtUrl(500)?.let { Uri.parse(it) })
+                    .build()
+            )
+            .build()
     }
 
     fun shufflePlay(songs: List<Song>) {
@@ -77,33 +128,69 @@ object PlayerManager {
         if (!isShuffled) {
             originalQueue = queue
         }
-        val mediaItems = queue.map { s ->
-            MediaItem.Builder()
-                .setUri(CacheManager.getPlaybackUri(s.id))
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle(s.title)
-                        .setArtist(s.artist)
-                        .setAlbumTitle(s.album)
-                        .setArtworkUri(s.coverArt?.let { Uri.parse(SubsonicClient.getCoverArtUrl(it, 500)) })
-                        .build()
-                )
-                .build()
+
+        val hasYoutube = queue.any { it.isYoutube }
+        if (hasYoutube) {
+            _state.value = _state.value.copy(isLoadingYoutube = true)
+            scope.launch {
+                try {
+                    // Resolve clicked song + next 2-3 in parallel
+                    val startIndex = queue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                    val toResolve = queue.filterIndexed { i, s ->
+                        s.isYoutube && i >= startIndex && i < startIndex + 4
+                    }
+                    toResolve.map { s ->
+                        async(Dispatchers.IO) {
+                            try {
+                                YoutubeClient.getStreamUrl(s.youtubeId)
+                            } catch (e: Exception) {
+                                Log.e("PlayerManager", "Failed to resolve YouTube URL for: ${s.title}", e)
+                            }
+                        }
+                    }.awaitAll()
+
+                    val mediaItems = queue.map { buildMediaItem(it) }
+                    controller.setMediaItems(mediaItems, startIndex, 0L)
+                    controller.prepare()
+                    controller.play()
+
+                    _state.value = _state.value.copy(
+                        currentSong = song,
+                        queue = queue,
+                        currentIndex = startIndex,
+                        isPlaying = true,
+                        isShuffled = isShuffled,
+                        isLoadingYoutube = false
+                    )
+
+                    // Resolve remaining YouTube songs in background
+                    val remaining = queue.filterIndexed { i, s ->
+                        s.isYoutube && (i < startIndex || i >= startIndex + 4)
+                    }
+                    for (s in remaining) {
+                        scope.launch(Dispatchers.IO) {
+                            try { YoutubeClient.getStreamUrl(s.youtubeId) } catch (_: Exception) {}
+                        }
+                    }
+                } catch (_: Exception) {
+                    _state.value = _state.value.copy(isLoadingYoutube = false)
+                }
+            }
+        } else {
+            val mediaItems = queue.map { buildMediaItem(it) }
+            val startIndex = queue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+            controller.setMediaItems(mediaItems, startIndex, 0L)
+            controller.prepare()
+            controller.play()
+
+            _state.value = _state.value.copy(
+                currentSong = song,
+                queue = queue,
+                currentIndex = startIndex,
+                isPlaying = true,
+                isShuffled = isShuffled
+            )
         }
-
-        val startIndex = queue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-
-        controller.setMediaItems(mediaItems, startIndex, 0L)
-        controller.prepare()
-        controller.play()
-
-        _state.value = _state.value.copy(
-            currentSong = song,
-            queue = queue,
-            currentIndex = startIndex,
-            isPlaying = true,
-            isShuffled = isShuffled
-        )
     }
 
     fun playNext(song: Song) {
@@ -112,42 +199,44 @@ object PlayerManager {
         val currentIndex = controller.currentMediaItemIndex
         val insertIndex = currentIndex + 1
 
-        val mediaItem = MediaItem.Builder()
-            .setUri(CacheManager.getPlaybackUri(song.id))
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(song.title)
-                    .setArtist(song.artist)
-                    .setAlbumTitle(song.album)
-                    .setArtworkUri(song.coverArt?.let { Uri.parse(SubsonicClient.getCoverArtUrl(it, 500)) })
-                    .build()
-            )
-            .build()
-
-        controller.addMediaItem(insertIndex, mediaItem)
-        currentQueue.add(insertIndex, song)
-        _state.value = _state.value.copy(queue = currentQueue)
+        if (song.isYoutube) {
+            scope.launch {
+                try {
+                    YoutubeClient.getStreamUrl(song.youtubeId)
+                } catch (_: Exception) {}
+                val mediaItem = buildMediaItem(song)
+                controller.addMediaItem(insertIndex, mediaItem)
+                currentQueue.add(insertIndex, song)
+                _state.value = _state.value.copy(queue = currentQueue)
+            }
+        } else {
+            val mediaItem = buildMediaItem(song)
+            controller.addMediaItem(insertIndex, mediaItem)
+            currentQueue.add(insertIndex, song)
+            _state.value = _state.value.copy(queue = currentQueue)
+        }
     }
 
     fun addToQueue(song: Song) {
         val controller = mediaController ?: return
         val currentQueue = _state.value.queue.toMutableList()
 
-        val mediaItem = MediaItem.Builder()
-            .setUri(CacheManager.getPlaybackUri(song.id))
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(song.title)
-                    .setArtist(song.artist)
-                    .setAlbumTitle(song.album)
-                    .setArtworkUri(song.coverArt?.let { Uri.parse(SubsonicClient.getCoverArtUrl(it, 500)) })
-                    .build()
-            )
-            .build()
-
-        controller.addMediaItem(mediaItem)
-        currentQueue.add(song)
-        _state.value = _state.value.copy(queue = currentQueue)
+        if (song.isYoutube) {
+            scope.launch {
+                try {
+                    YoutubeClient.getStreamUrl(song.youtubeId)
+                } catch (_: Exception) {}
+                val mediaItem = buildMediaItem(song)
+                controller.addMediaItem(mediaItem)
+                currentQueue.add(song)
+                _state.value = _state.value.copy(queue = currentQueue)
+            }
+        } else {
+            val mediaItem = buildMediaItem(song)
+            controller.addMediaItem(mediaItem)
+            currentQueue.add(song)
+            _state.value = _state.value.copy(queue = currentQueue)
+        }
     }
 
     fun removeFromQueue(index: Int) {
@@ -179,22 +268,9 @@ object PlayerManager {
         val currentSong = currentState.currentSong ?: return
 
         if (currentState.isShuffled) {
-            // Unshuffle: restore original order, keep current song playing
             val restoredQueue = originalQueue
             val newIndex = restoredQueue.indexOfFirst { it.id == currentSong.id }.coerceAtLeast(0)
-            val mediaItems = restoredQueue.map { s ->
-                MediaItem.Builder()
-                    .setUri(CacheManager.getPlaybackUri(s.id))
-                    .setMediaMetadata(
-                        MediaMetadata.Builder()
-                            .setTitle(s.title)
-                            .setArtist(s.artist)
-                            .setAlbumTitle(s.album)
-                            .setArtworkUri(s.coverArt?.let { Uri.parse(SubsonicClient.getCoverArtUrl(it, 500)) })
-                            .build()
-                    )
-                    .build()
-            }
+            val mediaItems = restoredQueue.map { buildMediaItem(it) }
             val position = controller.currentPosition
             controller.setMediaItems(mediaItems, newIndex, position)
             controller.prepare()
@@ -205,25 +281,12 @@ object PlayerManager {
                 isShuffled = false
             )
         } else {
-            // Shuffle: randomize queue but keep current song at its position
             originalQueue = currentState.queue
             val others = currentState.queue.filterIndexed { i, _ -> i != currentState.currentIndex }.shuffled()
             val shuffledQueue = mutableListOf<Song>()
             shuffledQueue.add(currentSong)
             shuffledQueue.addAll(others)
-            val mediaItems = shuffledQueue.map { s ->
-                MediaItem.Builder()
-                    .setUri(CacheManager.getPlaybackUri(s.id))
-                    .setMediaMetadata(
-                        MediaMetadata.Builder()
-                            .setTitle(s.title)
-                            .setArtist(s.artist)
-                            .setAlbumTitle(s.album)
-                            .setArtworkUri(s.coverArt?.let { Uri.parse(SubsonicClient.getCoverArtUrl(it, 500)) })
-                            .build()
-                    )
-                    .build()
-            }
+            val mediaItems = shuffledQueue.map { buildMediaItem(it) }
             val position = controller.currentPosition
             controller.setMediaItems(mediaItems, 0, position)
             controller.prepare()

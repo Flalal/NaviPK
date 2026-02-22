@@ -5,6 +5,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import fr.flal.navipk.api.Song
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.api.youtube.YoutubeClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -75,6 +76,9 @@ object CacheManager {
     }
 
     fun getPlaybackUri(songId: String): String {
+        if (songId.startsWith("yt:")) {
+            return YoutubeClient.getCachedStreamUrl(songId.removePrefix("yt:")) ?: ""
+        }
         val entry = index[songId]
         if (entry != null) {
             val file = File(cacheDir, entry.fileName)

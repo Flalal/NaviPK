@@ -57,6 +57,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -93,6 +94,10 @@ dependencies {
     implementation(libs.coil.compose)
     // Palette (dynamic colors from album art)
     implementation("androidx.palette:palette-ktx:1.0.0")
+    // NewPipeExtractor (YouTube search & stream extraction)
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.0")
+    // Core library desugaring (NewPipeExtractor uses java.time + java.nio)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.0.4")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
