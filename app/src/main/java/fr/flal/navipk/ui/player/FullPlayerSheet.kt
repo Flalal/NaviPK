@@ -51,6 +51,9 @@ fun FullPlayerSheet(
 ) {
     var showQueue by rememberSaveable { mutableStateOf(false) }
 
+    val song = playerState.currentSong
+    val coverUrl = song?.coverArtUrl(500)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -58,22 +61,48 @@ fun FullPlayerSheet(
         contentColor = OnPlayerPrimary,
         dragHandle = null
     ) {
-        AnimatedContent(
-            targetState = showQueue,
-            label = "playerQueueSwitch"
-        ) { isQueue ->
-            if (isQueue) {
-                QueueScreen(
-                    playerState = playerState,
-                    onBack = { showQueue = false },
-                    isOverlay = true
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
+            // Persistent blurred background
+            if (coverUrl != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AsyncImage(
+                    model = coverUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(60.dp),
+                    contentScale = ContentScale.Crop
                 )
-            } else {
-                NowPlayingContent(
-                    playerState = playerState,
-                    onDismiss = onDismiss,
-                    onQueueClick = { showQueue = true }
-                )
+            }
+
+            // Persistent dark overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(PlayerOverlay)
+            )
+
+            // Content switches between player and queue
+            AnimatedContent(
+                targetState = showQueue,
+                label = "playerQueueSwitch"
+            ) { isQueue ->
+                if (isQueue) {
+                    QueueScreen(
+                        playerState = playerState,
+                        onBack = { showQueue = false },
+                        isOverlay = true
+                    )
+                } else {
+                    NowPlayingContent(
+                        playerState = playerState,
+                        onDismiss = onDismiss,
+                        onQueueClick = { showQueue = true }
+                    )
+                }
             }
         }
     }
@@ -99,32 +128,11 @@ private fun NowPlayingContent(
         }
     }
 
+    val coverUrl = song?.coverArtUrl(500)
+
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
+        modifier = Modifier.fillMaxSize()
     ) {
-        // Layer 1: Blurred background
-        val coverUrl = song?.coverArtUrl(500)
-        if (coverUrl != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            AsyncImage(
-                model = coverUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(60.dp),
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        // Layer 2: Dark overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(PlayerOverlay)
-        )
-
-        // Layer 3: Content
         Column(
             modifier = Modifier
                 .fillMaxSize()
