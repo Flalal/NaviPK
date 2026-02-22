@@ -61,4 +61,10 @@ interface SubsonicApi {
 
     @GET("rest/getStarred2.view")
     suspend fun getStarred2(): SubsonicResponse
+
+    @GET("rest/updatePlaylist.view")
+    suspend fun updatePlaylist(
+        @Query("playlistId") playlistId: String,
+        @Query("songIdToAdd") songIdToAdd: String
+    ): SubsonicResponse
 }

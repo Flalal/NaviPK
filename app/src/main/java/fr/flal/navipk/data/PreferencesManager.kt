@@ -22,6 +22,12 @@ class PreferencesManager(context: Context) {
         return getServerUrl().isNotBlank() && getUsername().isNotBlank() && getPassword().isNotBlank()
     }
 
+    fun getMaxCacheSizeMb(): Int = prefs.getInt("max_cache_size_mb", 1024)
+
+    fun setMaxCacheSizeMb(sizeMb: Int) {
+        prefs.edit().putInt("max_cache_size_mb", sizeMb).apply()
+    }
+
     fun clear() {
         prefs.edit().clear().apply()
     }

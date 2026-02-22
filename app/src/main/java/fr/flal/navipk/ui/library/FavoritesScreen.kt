@@ -2,6 +2,7 @@ package fr.flal.navipk.ui.library
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -26,7 +27,8 @@ import fr.flal.navipk.player.PlayerManager
 fun FavoritesScreen(
     onBack: () -> Unit,
     onAlbumClick: (String) -> Unit,
-    onArtistClick: (String) -> Unit
+    onArtistClick: (String) -> Unit,
+    onPlaySong: (Song, List<Song>) -> Unit
 ) {
     var artists by remember { mutableStateOf<List<Artist>>(emptyList()) }
     var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
@@ -50,6 +52,7 @@ fun FavoritesScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Favoris") },
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
@@ -88,7 +91,7 @@ fun FavoritesScreen(
                         ) {
                             Button(
                                 onClick = {
-                                    PlayerManager.playSong(songs.first(), songs)
+                                    onPlaySong(songs.first(), songs)
                                 },
                                 modifier = Modifier.weight(1f)
                             ) {
@@ -120,7 +123,7 @@ fun FavoritesScreen(
                         SongItem(
                             song = song,
                             trackNumber = index + 1,
-                            onClick = { PlayerManager.playSong(song, songs) }
+                            onClick = { onPlaySong(song, songs) }
                         )
                     }
                 }

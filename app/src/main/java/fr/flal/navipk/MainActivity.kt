@@ -4,26 +4,59 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.data.CacheManager
 import fr.flal.navipk.data.PreferencesManager
 import fr.flal.navipk.player.PlayerManager
 import fr.flal.navipk.ui.library.*
 import fr.flal.navipk.ui.login.LoginScreen
 import fr.flal.navipk.ui.player.PlayerBar
 import fr.flal.navipk.ui.player.PlayerScreen
+import fr.flal.navipk.ui.player.QueueScreen
 import fr.flal.navipk.ui.search.SearchScreen
 import fr.flal.navipk.ui.theme.NaviPKTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -32,6 +65,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         preferencesManager = PreferencesManager(this)
+        CacheManager.init(this)
         PlayerManager.connect(this)
 
         // Restore session if already logged in
@@ -57,8 +91,19 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
     val navController = rememberNavController()
     val playerState by PlayerManager.state.collectAsState()
     val startDestination = if (preferencesManager.isLoggedIn()) "library" else "login"
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
 
     Column(modifier = Modifier.fillMaxSize()) {
+            // Global navigation bar (hidden on login)
+            if (currentRoute != null && currentRoute != "login") {
+                NavBar(
+                    currentRoute = currentRoute,
+                    navController = navController,
+                    preferencesManager = preferencesManager
+                )
+            }
+
             // Main navigation area
             NavHost(
                 navController = navController,
@@ -82,24 +127,6 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                     LibraryScreen(
                         onAlbumClick = { albumId ->
                             navController.navigate("album/$albumId")
-                        },
-                        onArtistsClick = {
-                            navController.navigate("artists")
-                        },
-                        onPlaylistsClick = {
-                            navController.navigate("playlists")
-                        },
-                        onSearchClick = {
-                            navController.navigate("search")
-                        },
-                        onFavoritesClick = {
-                            navController.navigate("favorites")
-                        },
-                        onLogout = {
-                            preferencesManager.clear()
-                            navController.navigate("login") {
-                                popUpTo("library") { inclusive = true }
-                            }
                         }
                     )
                 }
@@ -114,6 +141,7 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                         onBack = { navController.popBackStack() },
                         onPlaySong = { song, queue ->
                             PlayerManager.playSong(song, queue)
+                            navController.navigate("player")
                         }
                     )
                 }
@@ -160,6 +188,7 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                         onBack = { navController.popBackStack() },
                         onPlaySong = { song, queue ->
                             PlayerManager.playSong(song, queue)
+                            navController.navigate("player")
                         }
                     )
                 }
@@ -172,6 +201,10 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                         },
                         onArtistClick = { artistId ->
                             navController.navigate("artist/$artistId")
+                        },
+                        onPlaySong = { song, queue ->
+                            PlayerManager.playSong(song, queue)
+                            navController.navigate("player")
                         }
                     )
                 }
@@ -184,14 +217,36 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                         },
                         onArtistClick = { artistId ->
                             navController.navigate("artist/$artistId")
+                        },
+                        onPlaySong = { song, queue ->
+                            PlayerManager.playSong(song, queue)
+                            navController.navigate("player")
                         }
+                    )
+                }
+
+                composable("downloads") {
+                    DownloadsScreen(
+                        onBack = { navController.popBackStack() },
+                        onPlaySong = { song, queue ->
+                            PlayerManager.playSong(song, queue)
+                            navController.navigate("player")
+                        }
+                    )
+                }
+
+                composable("queue") {
+                    QueueScreen(
+                        playerState = playerState,
+                        onBack = { navController.popBackStack() }
                     )
                 }
 
                 composable("player") {
                     PlayerScreen(
                         playerState = playerState,
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onQueueClick = { navController.navigate("queue") }
                     )
                 }
             }
@@ -203,5 +258,107 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                     onClick = { navController.navigate("player") }
                 )
             }
+    }
+}
+
+@Composable
+fun NavBar(
+    currentRoute: String,
+    navController: NavController,
+    preferencesManager: PreferencesManager
+) {
+    val scope = rememberCoroutineScope()
+    Surface(tonalElevation = 3.dp) {
+        Column(modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NavBarItem(
+                    icon = Icons.Default.Home,
+                    label = "Accueil",
+                    isActive = currentRoute == "library",
+                    onClick = {
+                        navController.navigate("library") {
+                            popUpTo("library") { inclusive = true }
+                        }
+                    }
+                )
+                NavBarItem(
+                    icon = Icons.Default.Search,
+                    label = "Recherche",
+                    isActive = currentRoute == "search",
+                    onClick = { navController.navigate("search") }
+                )
+                NavBarItem(
+                    icon = Icons.Default.Shuffle,
+                    label = "Aléatoire",
+                    isActive = false,
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val response = SubsonicClient.getApi().getRandomSongs(50)
+                                val songs = response.subsonicResponse.randomSongs?.song ?: emptyList()
+                                PlayerManager.shufflePlay(songs)
+                            } catch (_: Exception) {}
+                        }
+                    }
+                )
+                NavBarItem(
+                    icon = Icons.Default.Favorite,
+                    label = "Favoris",
+                    isActive = currentRoute == "favorites",
+                    onClick = { navController.navigate("favorites") }
+                )
+                NavBarItem(
+                    icon = Icons.Default.Person,
+                    label = "Artistes",
+                    isActive = currentRoute == "artists" || currentRoute.startsWith("artist/"),
+                    onClick = { navController.navigate("artists") }
+                )
+                NavBarItem(
+                    icon = Icons.Default.QueueMusic,
+                    label = "Playlists",
+                    isActive = currentRoute == "playlists" || currentRoute.startsWith("playlist/"),
+                    onClick = { navController.navigate("playlists") }
+                )
+                NavBarItem(
+                    icon = Icons.Default.Download,
+                    label = "Downloads",
+                    isActive = currentRoute == "downloads",
+                    onClick = { navController.navigate("downloads") }
+                )
+                NavBarItem(
+                    icon = Icons.Default.Logout,
+                    label = "Déco",
+                    isActive = false,
+                    onClick = {
+                        preferencesManager.clear()
+                        navController.navigate("login") {
+                            popUpTo("library") { inclusive = true }
+                        }
+                    }
+                )
+            }
+            HorizontalDivider()
+        }
+    }
+}
+
+@Composable
+fun NavBarItem(
+    icon: ImageVector,
+    label: String,
+    isActive: Boolean,
+    onClick: () -> Unit
+) {
+    val tint = if (isActive) MaterialTheme.colorScheme.primary
+               else MaterialTheme.colorScheme.onSurfaceVariant
+
+    IconButton(onClick = onClick) {
+        Icon(icon, contentDescription = label, tint = tint)
     }
 }

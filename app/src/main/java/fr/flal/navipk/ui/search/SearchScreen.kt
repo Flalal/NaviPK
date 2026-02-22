@@ -2,6 +2,7 @@ package fr.flal.navipk.ui.search
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
@@ -16,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,7 +34,8 @@ import kotlinx.coroutines.launch
 fun SearchScreen(
     onBack: () -> Unit,
     onAlbumClick: (String) -> Unit,
-    onArtistClick: (String) -> Unit
+    onArtistClick: (String) -> Unit,
+    onPlaySong: (Song, List<Song>) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     var artists by remember { mutableStateOf<List<Artist>>(emptyList()) }
@@ -41,6 +45,12 @@ fun SearchScreen(
     var hasSearched by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboardController?.show()
+    }
 
     fun performSearch() {
         if (query.isBlank()) return
@@ -64,6 +74,7 @@ fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = {
                     OutlinedTextField(
                         value = query,
@@ -79,7 +90,7 @@ fun SearchScreen(
                                 }
                             }
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester)
                     )
                 },
                 navigationIcon = {
@@ -218,7 +229,7 @@ fun SearchScreen(
                                     }
                                 },
                                 modifier = Modifier.clickable {
-                                    PlayerManager.playSong(song, songs)
+                                    onPlaySong(song, songs)
                                 }
                             )
                         }

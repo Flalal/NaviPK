@@ -11,6 +11,7 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import fr.flal.navipk.api.Song
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.data.CacheManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +22,8 @@ data class PlayerState(
     val currentPosition: Long = 0L,
     val duration: Long = 0L,
     val queue: List<Song> = emptyList(),
-    val currentIndex: Int = 0
+    val currentIndex: Int = 0,
+    val repeatMode: Int = Player.REPEAT_MODE_OFF
 )
 
 object PlayerManager {
@@ -71,7 +73,7 @@ object PlayerManager {
         val controller = mediaController ?: return
         val mediaItems = queue.map { s ->
             MediaItem.Builder()
-                .setUri(SubsonicClient.getStreamUrl(s.id))
+                .setUri(CacheManager.getPlaybackUri(s.id))
                 .setMediaMetadata(
                     MediaMetadata.Builder()
                         .setTitle(s.title)
@@ -104,7 +106,7 @@ object PlayerManager {
         val insertIndex = currentIndex + 1
 
         val mediaItem = MediaItem.Builder()
-            .setUri(SubsonicClient.getStreamUrl(song.id))
+            .setUri(CacheManager.getPlaybackUri(song.id))
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(song.title)
@@ -125,7 +127,7 @@ object PlayerManager {
         val currentQueue = _state.value.queue.toMutableList()
 
         val mediaItem = MediaItem.Builder()
-            .setUri(SubsonicClient.getStreamUrl(song.id))
+            .setUri(CacheManager.getPlaybackUri(song.id))
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(song.title)
@@ -141,6 +143,29 @@ object PlayerManager {
         _state.value = _state.value.copy(queue = currentQueue)
     }
 
+    fun removeFromQueue(index: Int) {
+        val controller = mediaController ?: return
+        val currentQueue = _state.value.queue.toMutableList()
+        if (index !in currentQueue.indices) return
+        controller.removeMediaItem(index)
+        currentQueue.removeAt(index)
+        val newIndex = controller.currentMediaItemIndex
+        val newSong = if (newIndex in currentQueue.indices) currentQueue[newIndex] else null
+        _state.value = _state.value.copy(
+            queue = currentQueue,
+            currentIndex = newIndex,
+            currentSong = newSong
+        )
+    }
+
+    fun playAtIndex(index: Int) {
+        val controller = mediaController ?: return
+        val queue = _state.value.queue
+        if (index !in queue.indices) return
+        controller.seekTo(index, 0L)
+        controller.play()
+    }
+
     fun togglePlayPause() {
         val controller = mediaController ?: return
         if (controller.isPlaying) controller.pause() else controller.play()
@@ -152,6 +177,17 @@ object PlayerManager {
 
     fun previous() {
         mediaController?.seekToPreviousMediaItem()
+    }
+
+    fun toggleRepeatMode() {
+        val controller = mediaController ?: return
+        val newMode = when (controller.repeatMode) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
+        controller.repeatMode = newMode
+        _state.value = _state.value.copy(repeatMode = newMode)
     }
 
     fun seekTo(position: Long) {

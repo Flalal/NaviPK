@@ -2,14 +2,20 @@ package fr.flal.navipk.ui.library
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,8 +27,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import fr.flal.navipk.api.AlbumWithSongs
+import fr.flal.navipk.api.Playlist
 import fr.flal.navipk.api.Song
 import fr.flal.navipk.api.SubsonicClient
+import fr.flal.navipk.data.CacheManager
+import fr.flal.navipk.data.DownloadState
 import fr.flal.navipk.player.PlayerManager
 import kotlinx.coroutines.launch
 
@@ -35,6 +44,8 @@ fun AlbumDetailScreen(
 ) {
     var album by remember { mutableStateOf<AlbumWithSongs?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+    val cachedIds by CacheManager.cachedSongIds.collectAsState()
 
     LaunchedEffect(albumId) {
         try {
@@ -50,6 +61,7 @@ fun AlbumDetailScreen(
         topBar = {
             TopAppBar(
                 title = { Text(album?.name ?: "Album") },
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
@@ -123,6 +135,24 @@ fun AlbumDetailScreen(
                             Text("Lecture aléatoire")
                         }
                         Spacer(modifier = Modifier.height(8.dp))
+                        val allCached = songs.isNotEmpty() && songs.all { it.id in cachedIds }
+                        OutlinedButton(
+                            onClick = {
+                                if (songs.isNotEmpty()) {
+                                    scope.launch { CacheManager.downloadSongs(songs) }
+                                }
+                            },
+                            enabled = !allCached,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                        ) {
+                            Icon(
+                                if (allCached) Icons.Default.CloudDone else Icons.Default.Download,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (allCached) "Téléchargé" else "Télécharger")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                         HorizontalDivider()
                     }
 
@@ -143,7 +173,12 @@ fun AlbumDetailScreen(
 fun SongItem(song: Song, trackNumber: Int, onClick: () -> Unit) {
     var showMenu by remember { mutableStateOf(false) }
     var isFavorite by remember { mutableStateOf(false) }
+    var showPlaylistDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val cachedIds by CacheManager.cachedSongIds.collectAsState()
+    val downloadStates by CacheManager.downloadStates.collectAsState()
+    val isCached = song.id in cachedIds
+    val dlState = downloadStates[song.id]
 
     ListItem(
         headlineContent = {
@@ -161,11 +196,22 @@ fun SongItem(song: Song, trackNumber: Int, onClick: () -> Unit) {
             )
         },
         leadingContent = {
-            Text(
-                text = "$trackNumber",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "$trackNumber",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (isCached) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        Icons.Default.CloudDone,
+                        contentDescription = "Hors-ligne",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -203,6 +249,52 @@ fun SongItem(song: Song, trackNumber: Int, onClick: () -> Unit) {
                             }
                         )
                         DropdownMenuItem(
+                            text = { Text("Ajouter à une playlist") },
+                            leadingIcon = {
+                                Icon(Icons.Default.PlaylistAdd, contentDescription = null)
+                            },
+                            onClick = {
+                                showMenu = false
+                                showPlaylistDialog = true
+                            }
+                        )
+                        if (isCached) {
+                            DropdownMenuItem(
+                                text = { Text("Supprimer du cache") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Delete, contentDescription = null)
+                                },
+                                onClick = {
+                                    CacheManager.removeSong(song.id)
+                                    showMenu = false
+                                }
+                            )
+                        } else {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        when (dlState) {
+                                            DownloadState.DOWNLOADING -> "Téléchargement..."
+                                            DownloadState.ERROR -> "Réessayer le téléchargement"
+                                            else -> "Télécharger"
+                                        }
+                                    )
+                                },
+                                leadingIcon = {
+                                    if (dlState == DownloadState.DOWNLOADING) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.Download, contentDescription = null)
+                                    }
+                                },
+                                enabled = dlState != DownloadState.DOWNLOADING,
+                                onClick = {
+                                    scope.launch { CacheManager.downloadSong(song) }
+                                    showMenu = false
+                                }
+                            )
+                        }
+                        DropdownMenuItem(
                             text = {
                                 Text(if (isFavorite) "Retirer des favoris" else "Ajouter aux favoris")
                             },
@@ -231,6 +323,64 @@ fun SongItem(song: Song, trackNumber: Int, onClick: () -> Unit) {
             }
         },
         modifier = Modifier.clickable(onClick = onClick)
+    )
+
+    if (showPlaylistDialog) {
+        PlaylistPickerDialog(
+            songId = song.id,
+            onDismiss = { showPlaylistDialog = false }
+        )
+    }
+}
+
+@Composable
+fun PlaylistPickerDialog(songId: String, onDismiss: () -> Unit) {
+    var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        try {
+            val response = SubsonicClient.getApi().getPlaylists()
+            playlists = response.subsonicResponse.playlists?.playlist ?: emptyList()
+        } catch (_: Exception) {}
+        isLoading = false
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Ajouter à une playlist") },
+        text = {
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (playlists.isEmpty()) {
+                Text("Aucune playlist")
+            } else {
+                LazyColumn {
+                    itemsIndexed(playlists) { _, playlist ->
+                        ListItem(
+                            headlineContent = { Text(playlist.name) },
+                            supportingContent = {
+                                Text("${playlist.songCount ?: 0} morceaux")
+                            },
+                            modifier = Modifier.clickable {
+                                scope.launch {
+                                    try {
+                                        SubsonicClient.getApi().updatePlaylist(playlist.id, songId)
+                                    } catch (_: Exception) {}
+                                }
+                                onDismiss()
+                            }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Annuler") }
+        }
     )
 }
 

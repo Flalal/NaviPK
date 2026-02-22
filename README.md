@@ -8,12 +8,13 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 - Streaming depuis un serveur Navidrome/Subsonic via HTTPS
 - Contrôles play/pause, suivant, précédent
 - Barre de progression avec seek
+- Mode repeat (off / tout répéter / répéter un)
 - Notification media (écran de verrouillage)
 - Contrôles Bluetooth (volant, autoradio)
 - Lecteur plein écran avec pochette d'album
 
 ### Bibliothèque
-- Parcourir les albums (grille avec pochettes)
+- Parcourir les albums (grille avec pochettes, pagination infinie)
 - Parcourir les artistes
 - Parcourir les playlists
 - Détail album avec liste des morceaux
@@ -39,6 +40,24 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 ### File d'attente
 - "Lire ensuite" : insérer un morceau après le morceau en cours
 - "Ajouter à la file" : ajouter un morceau en fin de queue
+- Écran file d'attente : voir, retirer ou sauter à un morceau
+- Morceau en cours mis en surbrillance
+
+### Cache offline
+- Téléchargement de morceaux pour écoute hors-ligne
+- Téléchargement par morceau, album entier ou playlist entière
+- Indicateur hors-ligne sur chaque morceau caché
+- Écran de gestion des téléchargements (taille du cache, suppression)
+- Lecture automatique depuis le cache local si disponible
+- Éviction LRU par timestamp
+
+### Playlists
+- Parcourir et lire les playlists
+- Ajouter un morceau à une playlist existante (depuis le menu contextuel)
+
+### Navigation
+- Barre de navigation globale avec icônes (visible sur toutes les pages)
+- Accès rapide : Accueil, Recherche, Shuffle, Favoris, Artistes, Playlists, Téléchargements
 
 ## Stack technique
 
@@ -51,7 +70,7 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 | Chargement d'images | Coil |
 | Navigation | Navigation Compose |
 | Architecture | MVVM (ViewModel + StateFlow) |
-| Stockage local | SharedPreferences |
+| Stockage local | SharedPreferences + cache fichiers interne |
 
 ## Prérequis
 
@@ -89,31 +108,34 @@ fr.flal.navipk/
 │   ├── SubsonicClient.kt       # Client HTTP singleton (auth, URLs)
 │   └── SubsonicModels.kt       # Modèles de données (Album, Song, Artist...)
 ├── data/
-│   └── PreferencesManager.kt   # Sauvegarde des credentials
+│   ├── CacheManager.kt         # Cache offline (téléchargement, index JSON, éviction)
+│   └── PreferencesManager.kt   # Sauvegarde des credentials + settings cache
 ├── player/
 │   ├── PlaybackService.kt      # Service Media3 (notification, Bluetooth)
-│   └── PlayerManager.kt        # Contrôle de la lecture (play, queue, shuffle)
+│   └── PlayerManager.kt        # Contrôle de la lecture (play, queue, shuffle, repeat)
 ├── ui/
 │   ├── login/
 │   │   └── LoginScreen.kt      # Écran de connexion
 │   ├── library/
-│   │   ├── LibraryScreen.kt         # Grille d'albums (écran principal)
-│   │   ├── AlbumDetailScreen.kt     # Détail album + SongItem
+│   │   ├── LibraryScreen.kt         # Grille d'albums (pagination infinie)
+│   │   ├── AlbumDetailScreen.kt     # Détail album + SongItem + PlaylistPickerDialog
 │   │   ├── ArtistsScreen.kt         # Liste des artistes
 │   │   ├── ArtistDetailScreen.kt    # Albums d'un artiste
 │   │   ├── PlaylistsScreen.kt       # Liste des playlists
 │   │   ├── PlaylistDetailScreen.kt  # Morceaux d'une playlist
-│   │   └── FavoritesScreen.kt       # Écran des favoris
+│   │   ├── FavoritesScreen.kt       # Écran des favoris
+│   │   └── DownloadsScreen.kt       # Gestion du cache offline
 │   ├── search/
 │   │   └── SearchScreen.kt     # Recherche globale
 │   ├── player/
 │   │   ├── PlayerBar.kt        # Mini lecteur (bas de l'écran)
-│   │   └── PlayerScreen.kt     # Lecteur plein écran
+│   │   ├── PlayerScreen.kt     # Lecteur plein écran
+│   │   └── QueueScreen.kt      # File d'attente
 │   └── theme/
 │       ├── Color.kt
 │       ├── Theme.kt
 │       └── Type.kt
-└── MainActivity.kt              # Point d'entrée + Navigation
+└── MainActivity.kt              # Point d'entrée + NavBar globale + Navigation
 ```
 
 ## API Subsonic
@@ -123,12 +145,13 @@ L'application utilise les endpoints suivants de l'API Subsonic (v1.16.1) :
 | Endpoint | Usage |
 |---|---|
 | `ping.view` | Test de connexion |
-| `getAlbumList2.view` | Liste des albums |
+| `getAlbumList2.view` | Liste des albums (avec pagination) |
 | `getAlbum.view` | Détail d'un album + morceaux |
 | `getArtists.view` | Liste des artistes |
 | `getArtist.view` | Détail d'un artiste + albums |
 | `getPlaylists.view` | Liste des playlists |
 | `getPlaylist.view` | Détail d'une playlist + morceaux |
+| `updatePlaylist.view` | Ajouter un morceau à une playlist |
 | `search3.view` | Recherche globale |
 | `getRandomSongs.view` | Morceaux aléatoires |
 | `star.view` / `unstar.view` | Ajouter/retirer des favoris |

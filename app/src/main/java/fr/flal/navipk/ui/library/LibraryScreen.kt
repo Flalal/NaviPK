@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,30 +17,29 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import fr.flal.navipk.api.Album
-import fr.flal.navipk.api.Song
 import fr.flal.navipk.api.SubsonicClient
-import fr.flal.navipk.player.PlayerManager
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
-    onAlbumClick: (String) -> Unit,
-    onArtistsClick: () -> Unit,
-    onPlaylistsClick: () -> Unit,
-    onSearchClick: () -> Unit,
-    onFavoritesClick: () -> Unit,
-    onLogout: () -> Unit
+    onAlbumClick: (String) -> Unit
 ) {
     var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isLoadingMore by remember { mutableStateOf(false) }
+    var hasMore by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val gridState = rememberLazyGridState()
+    val pageSize = 50
 
     LaunchedEffect(Unit) {
         try {
-            val response = SubsonicClient.getApi().getAlbumList2()
-            albums = response.subsonicResponse.albumList2?.album ?: emptyList()
+            val response = SubsonicClient.getApi().getAlbumList2(size = pageSize, offset = 0)
+            val loaded = response.subsonicResponse.albumList2?.album ?: emptyList()
+            albums = loaded
+            hasMore = loaded.size >= pageSize
         } catch (e: Exception) {
             errorMessage = e.localizedMessage
         } finally {
@@ -48,38 +47,32 @@ fun LibraryScreen(
         }
     }
 
+    // Load more when reaching end
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val lastVisibleIndex = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            hasMore && !isLoadingMore && lastVisibleIndex >= albums.size - 6
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore && albums.isNotEmpty()) {
+            isLoadingMore = true
+            try {
+                val response = SubsonicClient.getApi().getAlbumList2(size = pageSize, offset = albums.size)
+                val loaded = response.subsonicResponse.albumList2?.album ?: emptyList()
+                albums = albums + loaded
+                hasMore = loaded.size >= pageSize
+            } catch (_: Exception) {}
+            isLoadingMore = false
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("NaviPK") },
-                actions = {
-                    IconButton(onClick = onSearchClick) {
-                        Icon(Icons.Default.Search, contentDescription = "Recherche")
-                    }
-                    IconButton(onClick = {
-                        scope.launch {
-                            try {
-                                val response = SubsonicClient.getApi().getRandomSongs(50)
-                                val songs = response.subsonicResponse.randomSongs?.song ?: emptyList()
-                                PlayerManager.shufflePlay(songs)
-                            } catch (_: Exception) {}
-                        }
-                    }) {
-                        Icon(Icons.Default.Shuffle, contentDescription = "Lecture aléatoire")
-                    }
-                    IconButton(onClick = onFavoritesClick) {
-                        Icon(Icons.Default.Favorite, contentDescription = "Favoris")
-                    }
-                    IconButton(onClick = onArtistsClick) {
-                        Icon(Icons.Default.Person, contentDescription = "Artistes")
-                    }
-                    IconButton(onClick = onPlaylistsClick) {
-                        Icon(Icons.Default.QueueMusic, contentDescription = "Playlists")
-                    }
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.Logout, contentDescription = "Déconnexion")
-                    }
-                }
+                windowInsets = WindowInsets(0, 0, 0, 0)
             )
         }
     ) { padding ->
@@ -105,8 +98,10 @@ fun LibraryScreen(
                             errorMessage = null
                             scope.launch {
                                 try {
-                                    val response = SubsonicClient.getApi().getAlbumList2()
-                                    albums = response.subsonicResponse.albumList2?.album ?: emptyList()
+                                    val response = SubsonicClient.getApi().getAlbumList2(size = pageSize, offset = 0)
+                                    val loaded = response.subsonicResponse.albumList2?.album ?: emptyList()
+                                    albums = loaded
+                                    hasMore = loaded.size >= pageSize
                                 } catch (e: Exception) {
                                     errorMessage = e.localizedMessage
                                 } finally {
@@ -123,10 +118,21 @@ fun LibraryScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     contentPadding = PaddingValues(8.dp),
+                    state = gridState,
                     modifier = Modifier.fillMaxSize().padding(padding)
                 ) {
                     items(albums) { album ->
                         AlbumCard(album = album, onClick = { onAlbumClick(album.id) })
+                    }
+                    if (isLoadingMore) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            }
+                        }
                     }
                 }
             }
