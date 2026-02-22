@@ -1,210 +1,178 @@
 # NaviPK
 
-Application Android de lecture musicale compatible avec les serveurs [Navidrome](https://www.navidrome.org/) / Subsonic.
+**Android music player for Navidrome/Subsonic servers — with YouTube integration, offline caching, and auto-radio.**
 
-## Fonctionnalités
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Android Min SDK](https://img.shields.io/badge/Android-8.0%2B%20(API%2026)-green.svg)](https://developer.android.com/about/versions/oreo)
+[![Latest Release](https://img.shields.io/github/v/release/Flalal/NaviPK)](https://github.com/Flalal/NaviPK/releases)
 
-### Lecture audio
-- Streaming depuis un serveur Navidrome/Subsonic via HTTPS
-- Contrôles play/pause, suivant, précédent
-- Barre de progression avec seek
-- Mode repeat (off / tout répéter / répéter un)
-- Notification media (écran de verrouillage)
-- Contrôles Bluetooth (volant, autoradio)
-- Lecteur plein écran en bottom sheet avec fond flou de la pochette
-- Mini lecteur avec barre de progression, texte défilant et animations
+<!-- Screenshots coming soon -->
 
-### Interface premium
-- Thème dark-first (fond near-black, surfaces sombres)
-- Couleurs dynamiques extraites de la pochette en cours (Palette API)
-- Transitions de couleurs animées (500ms) lors du changement de morceau
-- Bottom NavigationBar 5 onglets (Accueil, Recherche, Favoris, Playlists, Downloads)
-- Fond flou album art sur le lecteur plein écran (API 31+, fallback sombre)
-- Animations Crossfade sur play/pause et pochette, AnimatedContent sur titre/artiste
+## Features
 
-### Bibliothèque
-- Parcourir les albums (grille avec pochettes, pagination infinie)
-- Parcourir les artistes (accessible via chip dans l'accueil)
-- Parcourir les playlists
-- Détail album avec header pleine largeur et gradient overlay
-- Détail artiste avec ses albums
-- Détail playlist avec ses morceaux
+### Streaming & Playback
+- Stream from any Navidrome/Subsonic server over HTTPS
+- Play/pause, next, previous, seekable progress bar
+- Repeat modes (off / repeat all / repeat one)
+- Persistent shuffle toggle — shuffles/restores the queue without interrupting playback
+- Lock screen & Bluetooth controls (car stereo, steering wheel)
 
-### YouTube
-- Recherche de musique sur YouTube (bascule Navidrome/YouTube)
-- Lecture en streaming avec résolution d'URL automatique
-- Favoris YouTube stockés localement (JSON)
-- Playlists YouTube locales (création, ajout de morceaux, suppression, retrait individuel)
-- Import de playlist YouTube publique par URL (avec pagination complète)
-- Menu contextuel complet sur les résultats YouTube (favoris, playlist, lire ensuite, ajouter à la file, radio)
-- Ajout à une playlist depuis le lecteur plein écran (Navidrome ou YouTube)
+### YouTube Integration
+- Search and stream music from YouTube (toggle between Navidrome and YouTube)
+- Automatic URL resolution via NewPipe Extractor
+- Local YouTube favorites and playlists (stored as JSON)
+- Import public YouTube playlists by URL (with full pagination)
+- Full context menu on YouTube results (favorite, playlist, play next, enqueue, radio)
 
-### Recherche
-- Recherche globale (artistes, albums, morceaux)
-- Résultats groupés par catégorie
-- Lecture directe depuis les résultats
+### Playlists & Radio
+- Browse and play Navidrome playlists
+- Mixed playlists — combine Navidrome and YouTube tracks in a single local playlist
+- Create, delete, and manage playlists (Navidrome or local)
+- Auto-radio from any track — similar songs via `getSimilarSongs2`, YouTube search, or random fallback
 
-### Lecture aléatoire (Shuffle)
-- Shuffle global (morceaux aléatoires du serveur, accessible via chip dans l'accueil)
-- Shuffle par album
-- Shuffle par artiste (tous les morceaux de tous ses albums)
-- Shuffle par playlist
-- Shuffle persistant : bouton toggle dans le lecteur, mélange/restaure la queue sans interrompre la lecture
+### Offline Cache
+- Download tracks for offline playback (individual, full album, or full playlist)
+- Automatic local playback when cached
+- Configurable cache size (512 MB to unlimited) with LRU eviction
+- Dedicated downloads management screen
 
-### Favoris
-- Marquer/démarquer un morceau en favori (star/unstar Subsonic)
-- Favoris YouTube locaux (stockage JSON, toggle depuis le player ou le menu contextuel)
-- Écran dédié listant tous les favoris (morceaux, albums, artistes, YouTube)
-- Lecture directe ou aléatoire des favoris
+### Library & Search
+- Browse albums (infinite-scroll grid with cover art), artists, and playlists
+- Full-width album headers with gradient overlays
+- Global search across artists, albums, and tracks — grouped results
+- Favorites screen (tracks, albums, artists, YouTube)
 
-### File d'attente
-- "Lire ensuite" : insérer un morceau après le morceau en cours
-- "Ajouter à la file" : ajouter un morceau en fin de queue
-- File d'attente intégrée dans le lecteur plein écran (slide animé)
-- Réorganisation de la queue : flèches haut/bas pour déplacer les morceaux
-- Morceau en cours mis en surbrillance
+### Premium UI
+- Dark-first theme with dynamic colors extracted from album art (Palette API)
+- Animated color transitions (500 ms crossfade) on track change
+- Full-screen player in a modal bottom sheet with blurred album art background
+- Mini player with progress bar, marquee text, and crossfade animations
+- 5-tab bottom navigation (Home, Search, Favorites, Playlists, Downloads)
 
-### Cache offline
-- Téléchargement de morceaux pour écoute hors-ligne
-- Téléchargement par morceau, album entier ou playlist entière
-- Indicateur hors-ligne sur chaque morceau caché
-- Écran de gestion des téléchargements (taille du cache, suppression)
-- Réglage de la taille max du cache dans l'UI (512 Mo à illimité)
-- Lecture automatique depuis le cache local si disponible
-- Éviction LRU par timestamp
+## Tech Stack
 
-### Playlists
-- Parcourir et lire les playlists (Navidrome + locales)
-- Playlists mixtes : mélanger morceaux Navidrome et YouTube dans une même playlist locale
-- Créer une playlist vide (Navidrome ou locale)
-- Supprimer une playlist (avec confirmation)
-- Supprimer un morceau individuel d'une playlist locale
-- Ajouter un morceau à une playlist existante (depuis le menu contextuel ou le lecteur)
-- Import de playlist YouTube publique par URL
-- Playlists locales stockées en JSON
-
-### Radio / Mix automatique
-- Lancer une radio à partir de n'importe quel morceau (Navidrome ou YouTube)
-- Navidrome : morceaux similaires via `getSimilarSongs2`, fallback sur morceaux aléatoires
-- YouTube : recherche automatique de morceaux similaires
-- Accessible depuis le lecteur plein écran (bouton Radio) et le menu contextuel de chaque morceau
-
-### Navigation
-- Bottom NavigationBar 5 onglets avec préservation d'état (saveState/restoreState)
-- Accueil avec chips rapides (Artistes, Aléatoire)
-- Déconnexion accessible depuis le TopAppBar de l'accueil
-
-## Stack technique
-
-| Composant | Technologie |
-|---|---|
-| Langage | Kotlin |
+| Component | Technology |
+|-----------|-----------|
+| Language | Kotlin |
 | UI | Jetpack Compose + Material 3 |
-| Lecture audio | Media3 / ExoPlayer |
-| API HTTP | Retrofit + OkHttp |
-| Chargement d'images | Coil |
+| Audio | Media3 / ExoPlayer |
+| HTTP | Retrofit + OkHttp |
+| Images | Coil |
 | Navigation | Navigation Compose |
-| Couleurs dynamiques | AndroidX Palette |
+| Dynamic Colors | AndroidX Palette |
+| YouTube | NewPipe Extractor |
 | Architecture | MVVM (ViewModel + StateFlow) |
-| Stockage local | SharedPreferences + cache fichiers interne |
+| Local Storage | SharedPreferences + internal file cache |
 
-## Prérequis
+## Getting Started
 
-- Android Studio (dernière version)
+### Prerequisites
+
+- Android Studio (latest stable)
 - Android SDK 26+ (Android 8.0 minimum)
-- Un serveur Navidrome ou compatible Subsonic
+- A running [Navidrome](https://www.navidrome.org/) server (or any Subsonic-compatible server)
 
-## Installation
+### Build & Run
 
 ```bash
 git clone https://github.com/Flalal/NaviPK.git
+cd NaviPK
 ```
 
-1. Ouvrir le projet dans Android Studio
-2. Attendre le Gradle Sync
-3. Brancher un appareil Android en USB (mode développeur + débogage USB activés)
-4. Cliquer sur Run
+1. Open the project in Android Studio
+2. Wait for Gradle sync to complete
+3. Connect an Android device via USB (developer mode + USB debugging enabled)
+4. Click **Run**
 
-## Configuration
+### Configuration
 
-Au premier lancement, l'écran de connexion demande :
+On first launch, the login screen asks for:
 
-- **URL du serveur** : l'adresse de votre Navidrome (ex: `https://music.example.com`)
-- **Nom d'utilisateur** : votre login Navidrome
-- **Mot de passe** : votre mot de passe Navidrome
+- **Server URL** — your Navidrome address (e.g. `https://music.example.com`)
+- **Username** — your Navidrome login
+- **Password** — your Navidrome password
 
-Les identifiants sont sauvegardés localement. La connexion utilise l'authentification par token MD5 (salt + hash) de l'API Subsonic.
+Credentials are stored locally. Authentication uses the Subsonic API token method (MD5 salt + hash).
 
-## Structure du projet
+## Project Structure
 
 ```
 fr.flal.navipk/
 ├── api/
-│   ├── SubsonicApi.kt          # Interface Retrofit (endpoints)
-│   ├── SubsonicClient.kt       # Client HTTP singleton (auth, URLs)
-│   └── SubsonicModels.kt       # Modèles de données (Album, Song, Artist...)
+│   ├── SubsonicApi.kt            # Retrofit interface (Subsonic endpoints)
+│   ├── SubsonicClient.kt         # HTTP singleton (auth, stream/coverArt URLs)
+│   ├── SubsonicModels.kt         # Data classes (Song, Album, Artist, Playlist…)
+│   └── youtube/
+│       ├── YoutubeClient.kt      # YouTube search & URL resolution
+│       └── YoutubeDownloader.kt  # YouTube audio stream extraction
 ├── data/
-│   ├── CacheManager.kt         # Cache offline (téléchargement, index JSON, éviction)
-│   ├── PreferencesManager.kt   # Sauvegarde des credentials + settings cache
-│   └── YouTubeLibraryManager.kt # Favoris + playlists YouTube locaux (JSON + StateFlow)
+│   ├── CacheManager.kt           # Offline cache (download, JSON index, LRU eviction)
+│   ├── PreferencesManager.kt     # SharedPreferences (credentials, cache settings)
+│   └── YouTubeLibraryManager.kt  # Local YouTube favorites & playlists (JSON + StateFlow)
 ├── player/
-│   ├── PlaybackService.kt      # Service Media3 (notification, Bluetooth)
-│   ├── PlayerManager.kt        # Contrôle de la lecture (play, queue, shuffle, repeat)
-│   └── RadioManager.kt         # Génération de file radio (morceaux similaires)
+│   ├── PlaybackService.kt        # MediaSessionService (notification, Bluetooth)
+│   ├── PlayerManager.kt          # Playback control (queue, repeat, shuffle, seek)
+│   └── RadioManager.kt           # Auto-radio generation (similar songs / random fallback)
 ├── ui/
 │   ├── login/
-│   │   └── LoginScreen.kt      # Écran de connexion
+│   │   └── LoginScreen.kt
 │   ├── library/
-│   │   ├── LibraryScreen.kt         # Grille d'albums + chips (Artistes, Aléatoire) + logout
-│   │   ├── AlbumDetailScreen.kt     # Header album pleine largeur + gradient + SongItem + PlaylistPickerDialog
-│   │   ├── ArtistsScreen.kt         # Liste des artistes
-│   │   ├── ArtistDetailScreen.kt    # Albums d'un artiste
-│   │   ├── PlaylistsScreen.kt       # Liste des playlists
-│   │   ├── PlaylistDetailScreen.kt  # Morceaux d'une playlist
-│   │   ├── FavoritesScreen.kt       # Écran des favoris
-│   │   └── DownloadsScreen.kt       # Gestion du cache offline
+│   │   ├── LibraryScreen.kt           # Album grid + chips (Artists, Shuffle) + logout
+│   │   ├── AlbumDetailScreen.kt       # Album header + songs + PlaylistPickerDialog
+│   │   ├── ArtistsScreen.kt           # Artist list
+│   │   ├── ArtistDetailScreen.kt      # Artist detail + albums
+│   │   ├── PlaylistsScreen.kt         # Playlist list + create + delete + YouTube import
+│   │   ├── PlaylistDetailScreen.kt    # Playlist tracks
+│   │   ├── FavoritesScreen.kt         # Favorites screen
+│   │   └── DownloadsScreen.kt         # Cache management + size settings
 │   ├── search/
-│   │   └── SearchScreen.kt     # Recherche globale
+│   │   └── SearchScreen.kt            # Global search
 │   ├── player/
-│   │   ├── PlayerBar.kt        # MiniPlayer (progress bar, marquee, crossfade)
-│   │   ├── FullPlayerSheet.kt  # Lecteur plein écran (bottom sheet, fond flou, contrôles)
-│   │   └── QueueScreen.kt      # File d'attente (mode normal + overlay dans le player)
+│   │   ├── PlayerBar.kt               # Mini player (progress, marquee, crossfade)
+│   │   ├── FullPlayerSheet.kt         # Full-screen player (bottom sheet, blur, controls)
+│   │   └── QueueScreen.kt             # Queue view (standalone + overlay mode)
 │   └── theme/
-│       ├── Color.kt                  # Palette dark musicale
-│       ├── Theme.kt                  # Thème dynamique animé + shapes custom
-│       ├── Type.kt                   # 15 styles typographiques M3
-│       └── DynamicColorExtractor.kt  # Extraction couleur dominante via Palette API
-└── MainActivity.kt              # Entry point, Bottom NavigationBar, FullPlayerSheet overlay
+│       ├── Color.kt                    # Dark music palette
+│       ├── Theme.kt                    # Dynamic animated theme + custom shapes
+│       ├── Type.kt                     # Material 3 typography (15 styles)
+│       └── DynamicColorExtractor.kt    # Dominant color extraction (Palette + Coil)
+└── MainActivity.kt                     # Entry point, bottom nav, full player overlay
 ```
 
-## API Subsonic
+## Subsonic API Reference
 
-L'application utilise les endpoints suivants de l'API Subsonic (v1.16.1) :
+NaviPK targets Subsonic API v1.16.1:
 
-| Endpoint | Usage |
-|---|---|
-| `ping.view` | Test de connexion |
-| `getAlbumList2.view` | Liste des albums (avec pagination) |
-| `getAlbum.view` | Détail d'un album + morceaux |
-| `getArtists.view` | Liste des artistes |
-| `getArtist.view` | Détail d'un artiste + albums |
-| `getPlaylists.view` | Liste des playlists |
-| `getPlaylist.view` | Détail d'une playlist + morceaux |
-| `updatePlaylist.view` | Ajouter un morceau à une playlist |
-| `createPlaylist.view` | Créer une playlist |
-| `deletePlaylist.view` | Supprimer une playlist |
-| `search3.view` | Recherche globale |
-| `getRandomSongs.view` | Morceaux aléatoires |
-| `getSimilarSongs2.view` | Morceaux similaires (radio) |
-| `star.view` / `unstar.view` | Ajouter/retirer des favoris |
-| `getStarred2.view` | Récupérer les favoris |
-| `stream.view` | Streaming audio |
-| `getCoverArt.view` | Pochettes d'album |
+| Endpoint | Purpose |
+|----------|---------|
+| `ping.view` | Connection test |
+| `getAlbumList2.view` | Album list (paginated) |
+| `getAlbum.view` | Album detail + tracks |
+| `getArtists.view` | Artist list |
+| `getArtist.view` | Artist detail + albums |
+| `getPlaylists.view` | Playlist list |
+| `getPlaylist.view` | Playlist detail + tracks |
+| `createPlaylist.view` | Create a playlist |
+| `deletePlaylist.view` | Delete a playlist |
+| `updatePlaylist.view` | Add tracks to a playlist |
+| `search3.view` | Global search |
+| `getRandomSongs.view` | Random tracks |
+| `getSimilarSongs2.view` | Similar tracks (radio) |
+| `star.view` / `unstar.view` | Add/remove favorites |
+| `getStarred2.view` | Fetch favorites |
+| `stream.view` | Audio streaming |
+| `getCoverArt.view` | Album cover art |
 
-## Roadmap
+## Contributing
 
-*Toutes les features de la v1.5.0 sont livrées.*
+Contributions are welcome! Please read the [Contributing Guide](CONTRIBUTING.md) before submitting a pull request.
 
-## Licence
+## License
 
-Projet privé.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Navidrome](https://www.navidrome.org/) — open-source music server
+- [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor) — YouTube stream extraction
+- [Media3](https://developer.android.com/media/media3) — Android media playback library
