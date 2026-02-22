@@ -1,8 +1,8 @@
 package fr.flal.navipk.ui.library
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -22,6 +22,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,7 +63,6 @@ fun AlbumDetailScreen(
         topBar = {
             TopAppBar(
                 title = { Text(album?.name ?: "Album") },
-                windowInsets = WindowInsets(0, 0, 0, 0),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
@@ -83,31 +84,63 @@ fun AlbumDetailScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(padding)
                 ) {
+                    // Large header with album art and gradient
                     item {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(280.dp)
                         ) {
                             AsyncImage(
                                 model = alb.coverArt?.let { SubsonicClient.getCoverArtUrl(it, 500) },
                                 contentDescription = alb.name,
-                                modifier = Modifier
-                                    .size(150.dp)
-                                    .clip(MaterialTheme.shapes.medium),
+                                modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column {
-                                Text(alb.name, style = MaterialTheme.typography.headlineSmall)
+                            // Gradient overlay at bottom
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Transparent,
+                                                MaterialTheme.colorScheme.surface
+                                            ),
+                                            startY = 150f
+                                        )
+                                    )
+                            )
+                            // Album info at bottom
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(16.dp)
+                            ) {
+                                Text(
+                                    alb.name,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = Color.White
+                                )
                                 alb.artist?.let {
-                                    Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        it,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = Color.White.copy(alpha = 0.8f)
+                                    )
                                 }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text("${songs.size} morceaux", style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    "${songs.size} morceaux",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White.copy(alpha = 0.6f)
+                                )
                             }
                         }
+                    }
 
-                        // Play all button
+                    // Action buttons
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
                         Button(
                             onClick = {
                                 if (songs.isNotEmpty()) {
@@ -156,11 +189,12 @@ fun AlbumDetailScreen(
                         HorizontalDivider()
                     }
 
-                    itemsIndexed(songs) { index, song ->
+                    itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
                         SongItem(
                             song = song,
                             trackNumber = index + 1,
-                            onClick = { onPlaySong(song, songs) }
+                            onClick = { onPlaySong(song, songs) },
+                            modifier = Modifier.animateItem()
                         )
                     }
                 }
@@ -170,7 +204,13 @@ fun AlbumDetailScreen(
 }
 
 @Composable
-fun SongItem(song: Song, trackNumber: Int, onClick: () -> Unit, initialIsFavorite: Boolean = false) {
+fun SongItem(
+    song: Song,
+    trackNumber: Int,
+    onClick: () -> Unit,
+    initialIsFavorite: Boolean = false,
+    modifier: Modifier = Modifier
+) {
     var showMenu by remember { mutableStateOf(false) }
     var isFavorite by remember { mutableStateOf(initialIsFavorite) }
     var showPlaylistDialog by remember { mutableStateOf(false) }
@@ -322,7 +362,7 @@ fun SongItem(song: Song, trackNumber: Int, onClick: () -> Unit, initialIsFavorit
                 }
             }
         },
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = modifier.clickable(onClick = onClick)
     )
 
     if (showPlaylistDialog) {
@@ -335,7 +375,7 @@ fun SongItem(song: Song, trackNumber: Int, onClick: () -> Unit, initialIsFavorit
 
 @Composable
 fun PlaylistPickerDialog(songId: String, onDismiss: () -> Unit) {
-    var playlists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
+    var playlists by remember { mutableStateOf<List<fr.flal.navipk.api.Playlist>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
 

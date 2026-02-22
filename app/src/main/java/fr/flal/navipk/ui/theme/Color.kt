@@ -2,10 +2,18 @@ package fr.flal.navipk.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Dark-first palette for music app
+val NearBlack = Color(0xFF0E1117)
+val SurfaceDark = Color(0xFF161B22)
+val SurfaceVariantDark = Color(0xFF1C2128)
+val CardDark = Color(0xFF21262D)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+// Default accent (used when no dynamic color available)
+val AccentBlue = Color(0xFF58A6FF)
+val AccentBlueDark = Color(0xFF388BFD)
+
+// Semantic
+val PlayerOverlay = Color(0x80000000)
+val OnPlayerPrimary = Color(0xFFFFFFFF)
+val OnPlayerSecondary = Color(0xB3FFFFFF) // 70%
+val OnPlayerTertiary = Color(0x80FFFFFF) // 50%

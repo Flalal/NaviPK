@@ -2,11 +2,9 @@ package fr.flal.navipk.ui.library
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.PlayArrow
@@ -36,7 +34,6 @@ private val cacheSizeOptions = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadsScreen(
-    onBack: () -> Unit,
     onPlaySong: (Song, List<Song>) -> Unit,
     preferencesManager: PreferencesManager
 ) {
@@ -53,12 +50,6 @@ fun DownloadsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Téléchargements") },
-                windowInsets = WindowInsets(0, 0, 0, 0),
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
-                    }
-                }
             )
         }
     ) { padding ->

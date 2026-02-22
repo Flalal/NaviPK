@@ -39,7 +39,6 @@ fun ArtistsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Artistes") },
-                windowInsets = WindowInsets(0, 0, 0, 0),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")

@@ -52,7 +52,6 @@ fun PlaylistDetailScreen(
         topBar = {
             TopAppBar(
                 title = { Text(playlistName) },
-                windowInsets = WindowInsets(0, 0, 0, 0),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")

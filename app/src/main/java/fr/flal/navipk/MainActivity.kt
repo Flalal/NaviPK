@@ -4,41 +4,31 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -51,12 +41,11 @@ import fr.flal.navipk.data.PreferencesManager
 import fr.flal.navipk.player.PlayerManager
 import fr.flal.navipk.ui.library.*
 import fr.flal.navipk.ui.login.LoginScreen
-import fr.flal.navipk.ui.player.PlayerBar
-import fr.flal.navipk.ui.player.PlayerScreen
-import fr.flal.navipk.ui.player.QueueScreen
+import fr.flal.navipk.ui.player.FullPlayerSheet
+import fr.flal.navipk.ui.player.MiniPlayer
 import fr.flal.navipk.ui.search.SearchScreen
 import fr.flal.navipk.ui.theme.NaviPKTheme
-import kotlinx.coroutines.launch
+import fr.flal.navipk.ui.theme.rememberDominantColor
 
 class MainActivity : ComponentActivity() {
 
@@ -68,7 +57,6 @@ class MainActivity : ComponentActivity() {
         CacheManager.init(this)
         PlayerManager.connect(this)
 
-        // Restore session if already logged in
         if (preferencesManager.isLoggedIn()) {
             SubsonicClient.configure(
                 preferencesManager.getServerUrl(),
@@ -79,12 +67,24 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            NaviPKTheme {
-                NaviPKApp(preferencesManager)
-            }
+            NaviPKApp(preferencesManager)
         }
     }
 }
+
+private data class NavTab(
+    val route: String,
+    val label: String,
+    val icon: ImageVector
+)
+
+private val navTabs = listOf(
+    NavTab("library", "Accueil", Icons.Default.Home),
+    NavTab("search", "Recherche", Icons.Default.Search),
+    NavTab("favorites", "Favoris", Icons.Default.Favorite),
+    NavTab("playlists", "Playlists", Icons.Default.QueueMusic),
+    NavTab("downloads", "Downloads", Icons.Default.Download)
+)
 
 @Composable
 fun NaviPKApp(preferencesManager: PreferencesManager) {
@@ -93,22 +93,60 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
     val startDestination = if (preferencesManager.isLoggedIn()) "library" else "login"
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    var showFullPlayer by rememberSaveable { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-            // Global navigation bar (hidden on login)
-            if (currentRoute != null && currentRoute != "login") {
-                NavBar(
-                    currentRoute = currentRoute,
-                    navController = navController,
-                    preferencesManager = preferencesManager
-                )
+    // Dynamic color from current song's cover art
+    val coverArtUrl = remember(playerState.currentSong) {
+        playerState.currentSong?.coverArt?.let { SubsonicClient.getCoverArtUrl(it, 128) }
+    }
+    val dominantColor = rememberDominantColor(coverArtUrl)
+
+    NaviPKTheme(seedColor = dominantColor) {
+        val isLoggedIn = currentRoute != null && currentRoute != "login"
+
+        Scaffold(
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            bottomBar = {
+                if (isLoggedIn) {
+                    Column {
+                        if (playerState.currentSong != null) {
+                            MiniPlayer(
+                                playerState = playerState,
+                                onExpand = { showFullPlayer = true }
+                            )
+                        }
+                        NavigationBar {
+                            val tabRoutes = navTabs.map { it.route }
+                            navTabs.forEach { tab ->
+                                val selected = currentRoute == tab.route ||
+                                    (tab.route == "library" && currentRoute in listOf("album/{albumId}", "artists", "artist/{artistId}")) ||
+                                    (tab.route == "playlists" && currentRoute in listOf("playlist/{playlistId}"))
+                                NavigationBarItem(
+                                    selected = selected,
+                                    onClick = {
+                                        navController.navigate(tab.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    },
+                                    icon = { Icon(tab.icon, contentDescription = tab.label) },
+                                    label = { Text(tab.label) }
+                                )
+                            }
+                        }
+                    }
+                }
             }
-
-            // Main navigation area
+        ) { padding ->
             NavHost(
                 navController = navController,
                 startDestination = startDestination,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
             ) {
                 composable("login") {
                     LoginScreen(
@@ -127,6 +165,15 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                     LibraryScreen(
                         onAlbumClick = { albumId ->
                             navController.navigate("album/$albumId")
+                        },
+                        onArtistsClick = {
+                            navController.navigate("artists")
+                        },
+                        onLogout = {
+                            preferencesManager.clear()
+                            navController.navigate("login") {
+                                popUpTo("library") { inclusive = true }
+                            }
                         }
                     )
                 }
@@ -141,7 +188,7 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                         onBack = { navController.popBackStack() },
                         onPlaySong = { song, queue ->
                             PlayerManager.playSong(song, queue)
-                            navController.navigate("player")
+                            showFullPlayer = true
                         }
                     )
                 }
@@ -171,7 +218,6 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
 
                 composable("playlists") {
                     PlaylistsScreen(
-                        onBack = { navController.popBackStack() },
                         onPlaylistClick = { playlistId ->
                             navController.navigate("playlist/$playlistId")
                         }
@@ -188,14 +234,13 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                         onBack = { navController.popBackStack() },
                         onPlaySong = { song, queue ->
                             PlayerManager.playSong(song, queue)
-                            navController.navigate("player")
+                            showFullPlayer = true
                         }
                     )
                 }
 
                 composable("search") {
                     SearchScreen(
-                        onBack = { navController.popBackStack() },
                         onAlbumClick = { albumId ->
                             navController.navigate("album/$albumId")
                         },
@@ -204,14 +249,13 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                         },
                         onPlaySong = { song, queue ->
                             PlayerManager.playSong(song, queue)
-                            navController.navigate("player")
+                            showFullPlayer = true
                         }
                     )
                 }
 
                 composable("favorites") {
                     FavoritesScreen(
-                        onBack = { navController.popBackStack() },
                         onAlbumClick = { albumId ->
                             navController.navigate("album/$albumId")
                         },
@@ -220,146 +264,29 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                         },
                         onPlaySong = { song, queue ->
                             PlayerManager.playSong(song, queue)
-                            navController.navigate("player")
+                            showFullPlayer = true
                         }
                     )
                 }
 
                 composable("downloads") {
                     DownloadsScreen(
-                        onBack = { navController.popBackStack() },
                         onPlaySong = { song, queue ->
                             PlayerManager.playSong(song, queue)
-                            navController.navigate("player")
+                            showFullPlayer = true
                         },
                         preferencesManager = preferencesManager
                     )
                 }
-
-                composable("queue") {
-                    QueueScreen(
-                        playerState = playerState,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-
-                composable("player") {
-                    PlayerScreen(
-                        playerState = playerState,
-                        onBack = { navController.popBackStack() },
-                        onQueueClick = { navController.navigate("queue") }
-                    )
-                }
             }
-
-            // Player bar at the bottom (visible when a song is playing)
-            if (playerState.currentSong != null) {
-                PlayerBar(
-                    playerState = playerState,
-                    onClick = { navController.navigate("player") }
-                )
-            }
-    }
-}
-
-@Composable
-fun NavBar(
-    currentRoute: String,
-    navController: NavController,
-    preferencesManager: PreferencesManager
-) {
-    val scope = rememberCoroutineScope()
-    Surface(tonalElevation = 3.dp) {
-        Column(modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                NavBarItem(
-                    icon = Icons.Default.Home,
-                    label = "Accueil",
-                    isActive = currentRoute == "library",
-                    onClick = {
-                        navController.navigate("library") {
-                            popUpTo("library") { inclusive = true }
-                        }
-                    }
-                )
-                NavBarItem(
-                    icon = Icons.Default.Search,
-                    label = "Recherche",
-                    isActive = currentRoute == "search",
-                    onClick = { navController.navigate("search") }
-                )
-                NavBarItem(
-                    icon = Icons.Default.Shuffle,
-                    label = "Aléatoire",
-                    isActive = false,
-                    onClick = {
-                        scope.launch {
-                            try {
-                                val response = SubsonicClient.getApi().getRandomSongs(50)
-                                val songs = response.subsonicResponse.randomSongs?.song ?: emptyList()
-                                PlayerManager.shufflePlay(songs)
-                            } catch (_: Exception) {}
-                        }
-                    }
-                )
-                NavBarItem(
-                    icon = Icons.Default.Favorite,
-                    label = "Favoris",
-                    isActive = currentRoute == "favorites",
-                    onClick = { navController.navigate("favorites") }
-                )
-                NavBarItem(
-                    icon = Icons.Default.Person,
-                    label = "Artistes",
-                    isActive = currentRoute == "artists" || currentRoute.startsWith("artist/"),
-                    onClick = { navController.navigate("artists") }
-                )
-                NavBarItem(
-                    icon = Icons.Default.QueueMusic,
-                    label = "Playlists",
-                    isActive = currentRoute == "playlists" || currentRoute.startsWith("playlist/"),
-                    onClick = { navController.navigate("playlists") }
-                )
-                NavBarItem(
-                    icon = Icons.Default.Download,
-                    label = "Downloads",
-                    isActive = currentRoute == "downloads",
-                    onClick = { navController.navigate("downloads") }
-                )
-                NavBarItem(
-                    icon = Icons.Default.Logout,
-                    label = "Déco",
-                    isActive = false,
-                    onClick = {
-                        preferencesManager.clear()
-                        navController.navigate("login") {
-                            popUpTo("library") { inclusive = true }
-                        }
-                    }
-                )
-            }
-            HorizontalDivider()
         }
-    }
-}
 
-@Composable
-fun NavBarItem(
-    icon: ImageVector,
-    label: String,
-    isActive: Boolean,
-    onClick: () -> Unit
-) {
-    val tint = if (isActive) MaterialTheme.colorScheme.primary
-               else MaterialTheme.colorScheme.onSurfaceVariant
-
-    IconButton(onClick = onClick) {
-        Icon(icon, contentDescription = label, tint = tint)
+        // Full player overlay
+        if (showFullPlayer) {
+            FullPlayerSheet(
+                playerState = playerState,
+                onDismiss = { showFullPlayer = false }
+            )
+        }
     }
 }

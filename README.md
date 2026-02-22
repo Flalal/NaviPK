@@ -11,13 +11,22 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 - Mode repeat (off / tout répéter / répéter un)
 - Notification media (écran de verrouillage)
 - Contrôles Bluetooth (volant, autoradio)
-- Lecteur plein écran avec pochette d'album
+- Lecteur plein écran en bottom sheet avec fond flou de la pochette
+- Mini lecteur avec barre de progression, texte défilant et animations
+
+### Interface premium
+- Thème dark-first (fond near-black, surfaces sombres)
+- Couleurs dynamiques extraites de la pochette en cours (Palette API)
+- Transitions de couleurs animées (500ms) lors du changement de morceau
+- Bottom NavigationBar 5 onglets (Accueil, Recherche, Favoris, Playlists, Downloads)
+- Fond flou album art sur le lecteur plein écran (API 31+, fallback sombre)
+- Animations Crossfade sur play/pause et pochette, AnimatedContent sur titre/artiste
 
 ### Bibliothèque
 - Parcourir les albums (grille avec pochettes, pagination infinie)
-- Parcourir les artistes
+- Parcourir les artistes (accessible via chip dans l'accueil)
 - Parcourir les playlists
-- Détail album avec liste des morceaux
+- Détail album avec header pleine largeur et gradient overlay
 - Détail artiste avec ses albums
 - Détail playlist avec ses morceaux
 
@@ -27,7 +36,7 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 - Lecture directe depuis les résultats
 
 ### Lecture aléatoire (Shuffle)
-- Shuffle global (morceaux aléatoires du serveur)
+- Shuffle global (morceaux aléatoires du serveur, accessible via chip dans l'accueil)
 - Shuffle par album
 - Shuffle par artiste (tous les morceaux de tous ses albums)
 - Shuffle par playlist
@@ -41,7 +50,7 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 ### File d'attente
 - "Lire ensuite" : insérer un morceau après le morceau en cours
 - "Ajouter à la file" : ajouter un morceau en fin de queue
-- Écran file d'attente : voir, retirer ou sauter à un morceau
+- File d'attente intégrée dans le lecteur plein écran (slide animé)
 - Réorganisation de la queue : flèches haut/bas pour déplacer les morceaux
 - Morceau en cours mis en surbrillance
 
@@ -61,8 +70,9 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 - Ajouter un morceau à une playlist existante (depuis le menu contextuel)
 
 ### Navigation
-- Barre de navigation globale avec icônes (visible sur toutes les pages)
-- Accès rapide : Accueil, Recherche, Shuffle, Favoris, Artistes, Playlists, Téléchargements
+- Bottom NavigationBar 5 onglets avec préservation d'état (saveState/restoreState)
+- Accueil avec chips rapides (Artistes, Aléatoire)
+- Déconnexion accessible depuis le TopAppBar de l'accueil
 
 ## Stack technique
 
@@ -74,6 +84,7 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 | API HTTP | Retrofit + OkHttp |
 | Chargement d'images | Coil |
 | Navigation | Navigation Compose |
+| Couleurs dynamiques | AndroidX Palette |
 | Architecture | MVVM (ViewModel + StateFlow) |
 | Stockage local | SharedPreferences + cache fichiers interne |
 
@@ -122,8 +133,8 @@ fr.flal.navipk/
 │   ├── login/
 │   │   └── LoginScreen.kt      # Écran de connexion
 │   ├── library/
-│   │   ├── LibraryScreen.kt         # Grille d'albums (pagination infinie)
-│   │   ├── AlbumDetailScreen.kt     # Détail album + SongItem + PlaylistPickerDialog
+│   │   ├── LibraryScreen.kt         # Grille d'albums + chips (Artistes, Aléatoire) + logout
+│   │   ├── AlbumDetailScreen.kt     # Header album pleine largeur + gradient + SongItem + PlaylistPickerDialog
 │   │   ├── ArtistsScreen.kt         # Liste des artistes
 │   │   ├── ArtistDetailScreen.kt    # Albums d'un artiste
 │   │   ├── PlaylistsScreen.kt       # Liste des playlists
@@ -133,14 +144,15 @@ fr.flal.navipk/
 │   ├── search/
 │   │   └── SearchScreen.kt     # Recherche globale
 │   ├── player/
-│   │   ├── PlayerBar.kt        # Mini lecteur (bas de l'écran)
-│   │   ├── PlayerScreen.kt     # Lecteur plein écran
-│   │   └── QueueScreen.kt      # File d'attente
+│   │   ├── PlayerBar.kt        # MiniPlayer (progress bar, marquee, crossfade)
+│   │   ├── FullPlayerSheet.kt  # Lecteur plein écran (bottom sheet, fond flou, contrôles)
+│   │   └── QueueScreen.kt      # File d'attente (mode normal + overlay dans le player)
 │   └── theme/
-│       ├── Color.kt
-│       ├── Theme.kt
-│       └── Type.kt
-└── MainActivity.kt              # Point d'entrée + NavBar globale + Navigation
+│       ├── Color.kt                  # Palette dark musicale
+│       ├── Theme.kt                  # Thème dynamique animé + shapes custom
+│       ├── Type.kt                   # 15 styles typographiques M3
+│       └── DynamicColorExtractor.kt  # Extraction couleur dominante via Palette API
+└── MainActivity.kt              # Entry point, Bottom NavigationBar, FullPlayerSheet overlay
 ```
 
 ## API Subsonic

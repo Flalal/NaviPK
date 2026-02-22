@@ -65,6 +65,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     // Coil (album art)
     implementation(libs.coil.compose)
+    // Palette (dynamic colors from album art)
+    implementation("androidx.palette:palette-ktx:1.0.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
