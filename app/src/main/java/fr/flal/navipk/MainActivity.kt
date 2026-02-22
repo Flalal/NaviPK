@@ -231,7 +231,8 @@ fun NaviPKApp(preferencesManager: PreferencesManager) {
                         onPlaySong = { song, queue ->
                             PlayerManager.playSong(song, queue)
                             navController.navigate("player")
-                        }
+                        },
+                        preferencesManager = preferencesManager
                     )
                 }
 

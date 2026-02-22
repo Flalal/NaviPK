@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -88,13 +90,48 @@ fun QueueScreen(
                             }
                         },
                         trailingContent = {
-                            if (!isCurrent) {
-                                IconButton(onClick = { PlayerManager.removeFromQueue(index) }) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Retirer",
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (index > 0) {
+                                    IconButton(
+                                        onClick = { PlayerManager.moveInQueue(index, index - 1) },
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.KeyboardArrowUp,
+                                            contentDescription = "Monter",
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.size(40.dp))
+                                }
+                                if (index < queue.size - 1) {
+                                    IconButton(
+                                        onClick = { PlayerManager.moveInQueue(index, index + 1) },
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.KeyboardArrowDown,
+                                            contentDescription = "Descendre",
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.size(40.dp))
+                                }
+                                if (!isCurrent) {
+                                    IconButton(
+                                        onClick = { PlayerManager.removeFromQueue(index) },
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Retirer",
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.size(40.dp))
                                 }
                             }
                         },

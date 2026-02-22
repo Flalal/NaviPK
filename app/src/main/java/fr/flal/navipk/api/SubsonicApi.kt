@@ -67,4 +67,14 @@ interface SubsonicApi {
         @Query("playlistId") playlistId: String,
         @Query("songIdToAdd") songIdToAdd: String
     ): SubsonicResponse
+
+    @GET("rest/createPlaylist.view")
+    suspend fun createPlaylist(
+        @Query("name") name: String
+    ): SubsonicResponse
+
+    @GET("rest/deletePlaylist.view")
+    suspend fun deletePlaylist(
+        @Query("id") id: String
+    ): SubsonicResponse
 }

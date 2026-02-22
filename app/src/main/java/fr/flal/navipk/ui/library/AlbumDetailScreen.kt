@@ -170,9 +170,9 @@ fun AlbumDetailScreen(
 }
 
 @Composable
-fun SongItem(song: Song, trackNumber: Int, onClick: () -> Unit) {
+fun SongItem(song: Song, trackNumber: Int, onClick: () -> Unit, initialIsFavorite: Boolean = false) {
     var showMenu by remember { mutableStateOf(false) }
-    var isFavorite by remember { mutableStateOf(false) }
+    var isFavorite by remember { mutableStateOf(initialIsFavorite) }
     var showPlaylistDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val cachedIds by CacheManager.cachedSongIds.collectAsState()

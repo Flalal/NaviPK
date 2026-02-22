@@ -123,7 +123,8 @@ fun FavoritesScreen(
                         SongItem(
                             song = song,
                             trackNumber = index + 1,
-                            onClick = { onPlaySong(song, songs) }
+                            onClick = { onPlaySong(song, songs) },
+                            initialIsFavorite = true
                         )
                     }
                 }

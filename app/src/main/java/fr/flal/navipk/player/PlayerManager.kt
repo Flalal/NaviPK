@@ -23,7 +23,8 @@ data class PlayerState(
     val duration: Long = 0L,
     val queue: List<Song> = emptyList(),
     val currentIndex: Int = 0,
-    val repeatMode: Int = Player.REPEAT_MODE_OFF
+    val repeatMode: Int = Player.REPEAT_MODE_OFF,
+    val isShuffled: Boolean = false
 )
 
 object PlayerManager {
@@ -31,6 +32,7 @@ object PlayerManager {
     private var mediaController: MediaController? = null
     private val _state = MutableStateFlow(PlayerState())
     val state: StateFlow<PlayerState> = _state.asStateFlow()
+    private var originalQueue: List<Song> = emptyList()
 
     fun connect(context: Context) {
         val sessionToken = SessionToken(
@@ -65,12 +67,16 @@ object PlayerManager {
 
     fun shufflePlay(songs: List<Song>) {
         if (songs.isEmpty()) return
+        originalQueue = songs
         val shuffled = songs.shuffled()
-        playSong(shuffled.first(), shuffled)
+        playSong(shuffled.first(), shuffled, isShuffled = true)
     }
 
-    fun playSong(song: Song, queue: List<Song>) {
+    fun playSong(song: Song, queue: List<Song>, isShuffled: Boolean = false) {
         val controller = mediaController ?: return
+        if (!isShuffled) {
+            originalQueue = queue
+        }
         val mediaItems = queue.map { s ->
             MediaItem.Builder()
                 .setUri(CacheManager.getPlaybackUri(s.id))
@@ -95,7 +101,8 @@ object PlayerManager {
             currentSong = song,
             queue = queue,
             currentIndex = startIndex,
-            isPlaying = true
+            isPlaying = true,
+            isShuffled = isShuffled
         )
     }
 
@@ -164,6 +171,83 @@ object PlayerManager {
         if (index !in queue.indices) return
         controller.seekTo(index, 0L)
         controller.play()
+    }
+
+    fun toggleShuffle() {
+        val controller = mediaController ?: return
+        val currentState = _state.value
+        val currentSong = currentState.currentSong ?: return
+
+        if (currentState.isShuffled) {
+            // Unshuffle: restore original order, keep current song playing
+            val restoredQueue = originalQueue
+            val newIndex = restoredQueue.indexOfFirst { it.id == currentSong.id }.coerceAtLeast(0)
+            val mediaItems = restoredQueue.map { s ->
+                MediaItem.Builder()
+                    .setUri(CacheManager.getPlaybackUri(s.id))
+                    .setMediaMetadata(
+                        MediaMetadata.Builder()
+                            .setTitle(s.title)
+                            .setArtist(s.artist)
+                            .setAlbumTitle(s.album)
+                            .setArtworkUri(s.coverArt?.let { Uri.parse(SubsonicClient.getCoverArtUrl(it, 500)) })
+                            .build()
+                    )
+                    .build()
+            }
+            val position = controller.currentPosition
+            controller.setMediaItems(mediaItems, newIndex, position)
+            controller.prepare()
+            controller.play()
+            _state.value = currentState.copy(
+                queue = restoredQueue,
+                currentIndex = newIndex,
+                isShuffled = false
+            )
+        } else {
+            // Shuffle: randomize queue but keep current song at its position
+            originalQueue = currentState.queue
+            val others = currentState.queue.filterIndexed { i, _ -> i != currentState.currentIndex }.shuffled()
+            val shuffledQueue = mutableListOf<Song>()
+            shuffledQueue.add(currentSong)
+            shuffledQueue.addAll(others)
+            val mediaItems = shuffledQueue.map { s ->
+                MediaItem.Builder()
+                    .setUri(CacheManager.getPlaybackUri(s.id))
+                    .setMediaMetadata(
+                        MediaMetadata.Builder()
+                            .setTitle(s.title)
+                            .setArtist(s.artist)
+                            .setAlbumTitle(s.album)
+                            .setArtworkUri(s.coverArt?.let { Uri.parse(SubsonicClient.getCoverArtUrl(it, 500)) })
+                            .build()
+                    )
+                    .build()
+            }
+            val position = controller.currentPosition
+            controller.setMediaItems(mediaItems, 0, position)
+            controller.prepare()
+            controller.play()
+            _state.value = currentState.copy(
+                queue = shuffledQueue,
+                currentIndex = 0,
+                isShuffled = true
+            )
+        }
+    }
+
+    fun moveInQueue(from: Int, to: Int) {
+        val controller = mediaController ?: return
+        val currentQueue = _state.value.queue.toMutableList()
+        if (from !in currentQueue.indices || to !in currentQueue.indices) return
+        controller.moveMediaItem(from, to)
+        val song = currentQueue.removeAt(from)
+        currentQueue.add(to, song)
+        val newIndex = controller.currentMediaItemIndex
+        _state.value = _state.value.copy(
+            queue = currentQueue,
+            currentIndex = newIndex
+        )
     }
 
     fun togglePlayPause() {

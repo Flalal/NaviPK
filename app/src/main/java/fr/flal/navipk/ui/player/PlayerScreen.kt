@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.media3.common.Player
 import androidx.compose.material3.*
@@ -217,7 +218,18 @@ fun PlayerScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.size(48.dp))
+                IconButton(
+                    onClick = { PlayerManager.toggleShuffle() },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = "Aléatoire",
+                        modifier = Modifier.size(28.dp),
+                        tint = if (playerState.isShuffled) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
