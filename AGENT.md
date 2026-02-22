@@ -27,7 +27,7 @@ fr.flal.navipk/
 │   └── PreferencesManager.kt   # SharedPreferences (credentials, taille max cache)
 ├── player/
 │   ├── PlaybackService.kt      # MediaSessionService (notification, Bluetooth)
-│   └── PlayerManager.kt        # Singleton lecture (queue, repeat, play/pause, seek)
+│   └── PlayerManager.kt        # Singleton lecture (queue, repeat, shuffle toggle, play/pause, seek, moveInQueue)
 ├── ui/
 │   ├── login/
 │   │   └── LoginScreen.kt
@@ -36,16 +36,16 @@ fr.flal.navipk/
 │   │   ├── AlbumDetailScreen.kt     # Detail album + SongItem + PlaylistPickerDialog
 │   │   ├── ArtistsScreen.kt
 │   │   ├── ArtistDetailScreen.kt
-│   │   ├── PlaylistsScreen.kt
+│   │   ├── PlaylistsScreen.kt       # Liste playlists + creation (FAB) + suppression
 │   │   ├── PlaylistDetailScreen.kt
 │   │   ├── FavoritesScreen.kt
-│   │   └── DownloadsScreen.kt       # Gestion du cache offline
+│   │   └── DownloadsScreen.kt       # Gestion du cache offline + reglage taille max cache
 │   ├── search/
 │   │   └── SearchScreen.kt
 │   ├── player/
 │   │   ├── PlayerBar.kt             # Mini lecteur bas d'ecran
-│   │   ├── PlayerScreen.kt          # Lecteur plein ecran (repeat, favori, queue)
-│   │   └── QueueScreen.kt           # File d'attente (retirer, sauter a un morceau)
+│   │   ├── PlayerScreen.kt          # Lecteur plein ecran (repeat, shuffle toggle, favori, queue)
+│   │   └── QueueScreen.kt           # File d'attente (reordonner, retirer, sauter a un morceau)
 │   └── theme/
 │       ├── Color.kt
 │       ├── Theme.kt
@@ -60,7 +60,7 @@ fr.flal.navipk/
 - **Navigation** : routes string simples (`"library"`, `"album/{albumId}"`, `"player"`, etc.)
 - **NavBar globale** : definie dans `MainActivity.kt`, visible sur toutes les pages sauf login
 - **TopAppBar** : chaque screen a son propre `TopAppBar` avec `windowInsets = WindowInsets(0, 0, 0, 0)` car la NavBar gere deja les status bar insets
-- **SongItem** : composable reutilisable dans `AlbumDetailScreen.kt`, utilise par tous les ecrans de liste de morceaux
+- **SongItem** : composable reutilisable dans `AlbumDetailScreen.kt`, utilise par tous les ecrans de liste de morceaux. Parametre `initialIsFavorite` pour l'etat favori initial
 - **PlaylistPickerDialog** : dialog de selection de playlist, aussi dans `AlbumDetailScreen.kt`
 
 ## Points d'attention
@@ -73,4 +73,4 @@ fr.flal.navipk/
 
 ## API Subsonic utilisee
 
-Endpoints dans `SubsonicApi.kt` : `ping`, `getAlbumList2` (avec pagination offset/size), `getAlbum`, `getArtists`, `getArtist`, `getPlaylists`, `getPlaylist`, `updatePlaylist` (ajout de morceaux), `search3`, `getRandomSongs`, `star`, `unstar`, `getStarred2`, `stream.view`, `getCoverArt.view`.
+Endpoints dans `SubsonicApi.kt` : `ping`, `getAlbumList2` (avec pagination offset/size), `getAlbum`, `getArtists`, `getArtist`, `getPlaylists`, `getPlaylist`, `createPlaylist`, `deletePlaylist`, `updatePlaylist` (ajout de morceaux), `search3`, `getRandomSongs`, `star`, `unstar`, `getStarred2`, `stream.view`, `getCoverArt.view`.

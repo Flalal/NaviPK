@@ -31,6 +31,7 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 - Shuffle par album
 - Shuffle par artiste (tous les morceaux de tous ses albums)
 - Shuffle par playlist
+- Shuffle persistant : bouton toggle dans le lecteur, mélange/restaure la queue sans interrompre la lecture
 
 ### Favoris
 - Marquer/démarquer un morceau en favori (star/unstar Subsonic)
@@ -41,6 +42,7 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 - "Lire ensuite" : insérer un morceau après le morceau en cours
 - "Ajouter à la file" : ajouter un morceau en fin de queue
 - Écran file d'attente : voir, retirer ou sauter à un morceau
+- Réorganisation de la queue : flèches haut/bas pour déplacer les morceaux
 - Morceau en cours mis en surbrillance
 
 ### Cache offline
@@ -48,11 +50,14 @@ Application Android de lecture musicale compatible avec les serveurs [Navidrome]
 - Téléchargement par morceau, album entier ou playlist entière
 - Indicateur hors-ligne sur chaque morceau caché
 - Écran de gestion des téléchargements (taille du cache, suppression)
+- Réglage de la taille max du cache dans l'UI (512 Mo à illimité)
 - Lecture automatique depuis le cache local si disponible
 - Éviction LRU par timestamp
 
 ### Playlists
 - Parcourir et lire les playlists
+- Créer une playlist vide
+- Supprimer une playlist (avec confirmation)
 - Ajouter un morceau à une playlist existante (depuis le menu contextuel)
 
 ### Navigation
@@ -152,6 +157,8 @@ L'application utilise les endpoints suivants de l'API Subsonic (v1.16.1) :
 | `getPlaylists.view` | Liste des playlists |
 | `getPlaylist.view` | Détail d'une playlist + morceaux |
 | `updatePlaylist.view` | Ajouter un morceau à une playlist |
+| `createPlaylist.view` | Créer une playlist |
+| `deletePlaylist.view` | Supprimer une playlist |
 | `search3.view` | Recherche globale |
 | `getRandomSongs.view` | Morceaux aléatoires |
 | `star.view` / `unstar.view` | Ajouter/retirer des favoris |
