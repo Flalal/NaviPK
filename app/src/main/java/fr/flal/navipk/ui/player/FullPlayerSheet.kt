@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
@@ -36,6 +37,8 @@ import fr.flal.navipk.api.coverArtUrl
 import fr.flal.navipk.api.isYoutube
 import fr.flal.navipk.data.YouTubeLibraryManager
 import fr.flal.navipk.player.PlayerManager
+import fr.flal.navipk.ui.library.PlaylistPickerDialog
+import fr.flal.navipk.ui.library.YouTubePlaylistPickerDialog
 import fr.flal.navipk.player.PlayerState
 import fr.flal.navipk.ui.theme.OnPlayerPrimary
 import fr.flal.navipk.ui.theme.OnPlayerSecondary
@@ -334,7 +337,10 @@ private fun NowPlayingContent(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Action row: favorite + queue
+            // Action row: favorite + playlist + queue
+            var showPlaylistDialog by remember { mutableStateOf(false) }
+            var showYtPlaylistDialog by remember { mutableStateOf(false) }
+
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 modifier = Modifier.fillMaxWidth()
@@ -363,6 +369,17 @@ private fun NowPlayingContent(
                     )
                 }
 
+                IconButton(onClick = {
+                    val s = song ?: return@IconButton
+                    if (s.isYoutube) showYtPlaylistDialog = true else showPlaylistDialog = true
+                }) {
+                    Icon(
+                        Icons.Default.PlaylistAdd,
+                        contentDescription = "Ajouter à une playlist",
+                        tint = OnPlayerSecondary
+                    )
+                }
+
                 IconButton(onClick = onQueueClick) {
                     Icon(
                         Icons.Default.QueueMusic,
@@ -370,6 +387,20 @@ private fun NowPlayingContent(
                         tint = OnPlayerSecondary
                     )
                 }
+            }
+
+            if (showPlaylistDialog && song != null) {
+                PlaylistPickerDialog(
+                    songId = song.id,
+                    onDismiss = { showPlaylistDialog = false }
+                )
+            }
+
+            if (showYtPlaylistDialog && song != null) {
+                YouTubePlaylistPickerDialog(
+                    song = song,
+                    onDismiss = { showYtPlaylistDialog = false }
+                )
             }
 
             Spacer(modifier = Modifier.weight(1f))
